@@ -24,10 +24,10 @@
 
 /* Begin PBXFileReference section */
 		134814201AA4EA6300B7C361 /* libAmazonIvsReactNativeBroadcast.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = libAmazonIvsReactNativeBroadcast.a; sourceTree = BUILT_PRODUCTS_DIR; };
-		CE52431027BFF5470090DDAF /* IVSBroadcastCameraView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IVSBroadcastCameraView.swift; sourceTree = "<group>"; };
+		CE52431027BFF5470090DDAF /* IVSBroadcastCameraView.swift */ = {isa = PBXFileReference; indentWidth = 2; lastKnownFileType = sourcecode.swift; path = IVSBroadcastCameraView.swift; sourceTree = "<group>"; tabWidth = 2; };
 		CE52431227BFF5920090DDAF /* IVSBroadcastCameraViewError.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IVSBroadcastCameraViewError.swift; sourceTree = "<group>"; };
 		CE52431327BFF5B20090DDAF /* IVSBroadcastCameraViewManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IVSBroadcastCameraViewManager.swift; sourceTree = "<group>"; };
-		CE52431427BFF5C20090DDAF /* IVSBroadcastSessionService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IVSBroadcastSessionService.swift; sourceTree = "<group>"; };
+		CE52431427BFF5C20090DDAF /* IVSBroadcastSessionService.swift */ = {isa = PBXFileReference; indentWidth = 2; lastKnownFileType = sourcecode.swift; path = IVSBroadcastSessionService.swift; sourceTree = "<group>"; tabWidth = 2; };
 		CE52431527BFF5EE0090DDAF /* IVSBroadcastCameraViewManager.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = IVSBroadcastCameraViewManager.m; sourceTree = "<group>"; };
 		F4FF95D5245B92E700C19C63 /* IVSBroadcastCameraView-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "IVSBroadcastCameraView-Bridging-Header.h"; sourceTree = "<group>"; };
 /* End PBXFileReference section */

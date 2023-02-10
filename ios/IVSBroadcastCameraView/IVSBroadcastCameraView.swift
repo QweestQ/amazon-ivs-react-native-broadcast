@@ -11,6 +11,11 @@ class IVSBroadcastCameraView: UIView {
       self.broadcastSession.setIsMuted(isMuted)
     }
   }
+  @objc var zoom: NSNumber = 1 {
+    didSet {
+      self.broadcastSession.setZoom(zoom)
+    }
+  }
   @objc var isCameraPreviewMirrored: Bool = false {
     didSet {
       self.broadcastSession.setIsCameraPreviewMirrored(isCameraPreviewMirrored, self.onReceiveCameraPreviewHandler)

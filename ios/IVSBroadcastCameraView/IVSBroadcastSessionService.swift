@@ -366,6 +366,22 @@ class IVSBroadcastSessionService: NSObject {
       self.isInitialMuted = isMuted
     }
   }
+    
+  public func setZoom(_ zoom: NSNumber) {
+    let camera = AVCaptureDevice.default(
+      .builtInWideAngleCamera,
+      for: AVMediaType.video,
+      position: .back
+    )
+    
+    do {
+      try camera?.lockForConfiguration()
+    } catch {
+      return
+    }
+    
+    camera?.ramp(toVideoZoomFactor: CGFloat(truncating: zoom), withRate: 3)
+  }
   
   public func setSessionLogLevel(_ logLevel: NSString?) {
     if let logLevelName = logLevel {
