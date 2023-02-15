@@ -95,7 +95,7 @@ class IVSBroadcastCameraView: UIView {
       self.broadcastSession.setTransmissionStatisticsChangedHandler(onTransmissionStatisticsChanged)
     }
   }
-
+  
   @objc
   private func audioSessionInterrupted(_ notification: Notification) {
     guard let userInfo = notification.userInfo,
@@ -104,12 +104,12 @@ class IVSBroadcastCameraView: UIView {
     else { return }
     
     switch type {
-      case .began:
-        self.onAudioSessionInterrupted?([:])
-      case .ended:
-        self.onAudioSessionResumed?([:])
-      @unknown default:
-        break
+    case .began:
+      self.onAudioSessionInterrupted?([:])
+    case .ended:
+      self.onAudioSessionResumed?([:])
+    @unknown default:
+      break
     }
   }
   
@@ -166,6 +166,18 @@ class IVSBroadcastCameraView: UIView {
     ])
   }
   
+  private func setupOverlay() {
+    if (self.subviews.count == 0) {
+      return
+    }
+    
+    do  {
+      try self.subviews.forEach { try self.broadcastSession.addImage($0) }
+    } catch {
+      print("Failed to setup overlay")
+    }
+  }
+  
   override init(frame: CGRect) {
     super.init(frame: frame)
   }
@@ -189,6 +201,7 @@ class IVSBroadcastCameraView: UIView {
         UIApplication.shared.isIdleTimerDisabled = true
         self.subscribeToNotificationCenter()
         self.broadcastSession.getCameraPreviewAsync { (preview: UIView) -> Void in
+          self.setupOverlay()
           self.onReceiveCameraPreviewHandler(preview)
           self.onIsBroadcastReady?(["isReady": self.broadcastSession.isReady()])
         }
@@ -201,12 +214,12 @@ class IVSBroadcastCameraView: UIView {
   public func start(_ options: NSDictionary) {
     let rtmpsUrl = options["rtmpsUrl"] != nil ? options["rtmpsUrl"] : self.rtmpsUrl
     let streamKey = options["streamKey"] != nil ? options["streamKey"] : self.streamKey
-
+    
     guard let finalRtmpsUrl = rtmpsUrl else {
       assertionFailure("'rtmpsUrl' is empty.")
       return
     }
-
+    
     guard let finalStreamKey = streamKey else {
       assertionFailure("'streamKey' is empty.")
       return

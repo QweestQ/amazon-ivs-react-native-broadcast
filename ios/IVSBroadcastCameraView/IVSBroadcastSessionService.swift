@@ -1,5 +1,5 @@
 import AmazonIVSBroadcast
-import Foundation
+import AVFoundation
 
 typealias onReceiveCameraPreviewHandler = (_: IVSImagePreviewView) -> Void
 
@@ -36,105 +36,105 @@ class IVSBroadcastSessionService: NSObject {
   
   private func getLogLevel(_ logLevelName: NSString) -> IVSBroadcastSession.LogLevel {
     switch logLevelName {
-      case "debug":
-        return .debug
-      case "error":
-        return .error
-      case "info":
-        return .info
-      case "warning":
-        return .warn
-      default:
-        assertionFailure("Does not support log level: \(logLevelName)")
-        return .error
+    case "debug":
+      return .debug
+    case "error":
+      return .error
+    case "info":
+      return .info
+    case "warning":
+      return .warn
+    default:
+      assertionFailure("Does not support log level: \(logLevelName)")
+      return .error
     }
   }
   
   private func getAspectMode(_ aspectModeName: NSString) -> IVSBroadcastConfiguration.AspectMode {
     switch aspectModeName {
-      case "fit":
-        return .fit
-      case "fill":
-        return .fill
-      case "none":
-        return .none
-      default:
-        assertionFailure("Does not support aspect mode: \(aspectModeName)")
-        return .fill
+    case "fit":
+      return .fit
+    case "fill":
+      return .fill
+    case "none":
+      return .none
+    default:
+      assertionFailure("Does not support aspect mode: \(aspectModeName)")
+      return .fill
     }
   }
   
   private func getCameraPosition(_ cameraPositionName: NSString) -> IVSDevicePosition {
     switch(cameraPositionName) {
-      case "front":
-        return .front
-      case "back":
-        return .back
-      default:
-        assertionFailure("Does not support camera position: \(cameraPositionName)")
-        return .back
+    case "front":
+      return .front
+    case "back":
+      return .back
+    default:
+      assertionFailure("Does not support camera position: \(cameraPositionName)")
+      return .back
     }
   }
   
   private func getAudioSessionStrategy(_ audioSessionStrategyName: NSString) -> IVSBroadcastSession.AudioSessionStrategy {
     switch audioSessionStrategyName {
-      case "recordOnly":
-        return .recordOnly
-      case "playAndRecord":
-        return .playAndRecord
-      case "playAndRecordDefaultToSpeaker":
-        return .playAndRecordDefaultToSpeaker
-      case "noAction":
-        return .noAction
-      default:
-        assertionFailure("Does not support audio session strategy: \(audioSessionStrategyName).")
-        return .playAndRecord
+    case "recordOnly":
+      return .recordOnly
+    case "playAndRecord":
+      return .playAndRecord
+    case "playAndRecordDefaultToSpeaker":
+      return .playAndRecordDefaultToSpeaker
+    case "noAction":
+      return .noAction
+    default:
+      assertionFailure("Does not support audio session strategy: \(audioSessionStrategyName).")
+      return .playAndRecord
     }
   }
   
   private func getAudioQuality(_ audioQualityName: NSString) -> IVSBroadcastConfiguration.AudioQuality {
     switch audioQualityName {
-      case "minimum":
-        return .minimum
-      case "low":
-        return .low
-      case "medium":
-        return .medium
-      case "high":
-        return .high
-      case "maximum":
-        return .maximum
-      default:
-        assertionFailure("Does not support audio quality: \(audioQualityName).")
-        return .medium
+    case "minimum":
+      return .minimum
+    case "low":
+      return .low
+    case "medium":
+      return .medium
+    case "high":
+      return .high
+    case "maximum":
+      return .maximum
+    default:
+      assertionFailure("Does not support audio quality: \(audioQualityName).")
+      return .medium
     }
   }
   
   private func getAutomaticBitrateProfile(_ automaticBitrateProfileName: NSString) -> IVSVideoConfiguration.AutomaticBitrateProfile {
     switch automaticBitrateProfileName {
-      case "conservative":
-        return .conservative
-      case "fastIncrease":
-        return .fastIncrease
-      default:
-        assertionFailure("Does not support automatic bitrate profile: \(automaticBitrateProfileName).")
-        return .conservative
+    case "conservative":
+      return .conservative
+    case "fastIncrease":
+      return .fastIncrease
+    default:
+      assertionFailure("Does not support automatic bitrate profile: \(automaticBitrateProfileName).")
+      return .conservative
     }
   }
   
   private func getConfigurationPreset(_ configurationPresetName: NSString) -> IVSBroadcastConfiguration {
     switch configurationPresetName {
-      case "standardPortrait":
-        return IVSPresets.configurations().standardPortrait()
-      case "standardLandscape":
-        return IVSPresets.configurations().standardLandscape()
-      case "basicPortrait":
-        return IVSPresets.configurations().basicPortrait()
-      case "basicLandscape":
-        return IVSPresets.configurations().basicLandscape()
-      default:
-        assertionFailure("Does not support configuration preset: \(configurationPresetName).")
-        return IVSPresets.configurations().standardPortrait()
+    case "standardPortrait":
+      return IVSPresets.configurations().standardPortrait()
+    case "standardLandscape":
+      return IVSPresets.configurations().standardLandscape()
+    case "basicPortrait":
+      return IVSPresets.configurations().basicPortrait()
+    case "basicLandscape":
+      return IVSPresets.configurations().basicLandscape()
+    default:
+      assertionFailure("Does not support configuration preset: \(configurationPresetName).")
+      return IVSPresets.configurations().standardPortrait()
     }
   }
   
@@ -323,6 +323,27 @@ class IVSBroadcastSessionService: NSObject {
     self.swapCameraAsync(onReceiveCameraPreview)
   }
   
+  public func addImage(_ view: UIView) throws {
+    if (self.isInitialized()) {
+      let imageSlot = IVSMixerSlotConfiguration()
+      imageSlot.size = view.frame.size
+      imageSlot.position = view.layer.position
+      imageSlot.preferredVideoInput = .userImage
+      imageSlot.preferredAudioInput = .unknown
+      imageSlot.zIndex = 2
+      try imageSlot.setTransparency(0.7)
+      try imageSlot.setName("Test Name")
+      
+      broadcastSession!.mixer.removeSlot(withName: imageSlot.name)
+      broadcastSession!.mixer.addSlot(imageSlot)
+      
+      let imageSource = broadcastSession!.createImageSource(withName: imageSlot.name)
+      broadcastSession!.attach(imageSource, toSlotWithName: imageSlot.name) { _ in
+        imageSource.onSampleBuffer(view.asImage().cmSampleBuffer)
+      }
+    }
+  }
+  
   public func getCameraPreviewAsync(_ onReceiveCameraPreview: @escaping onReceiveCameraPreviewHandler) {
     self.broadcastSession?.awaitDeviceChanges { () -> Void in
       if let cameraPreview = self.getCameraPreview() {
@@ -366,7 +387,7 @@ class IVSBroadcastSessionService: NSObject {
       self.isInitialMuted = isMuted
     }
   }
-    
+  
   public func setZoom(_ zoom: NSNumber) {
     let camera = AVCaptureDevice.default(
       .builtInWideAngleCamera,
@@ -496,6 +517,67 @@ extension IVSBroadcastSessionService: IVSBroadcastSession.Delegate {
           "sessionId": session.sessionId,
         ]
       ])
+    }
+  }
+}
+
+extension UIImage {
+  var cvPixelBuffer: CVPixelBuffer? {
+    var pixelBuffer: CVPixelBuffer? = nil
+    let options: [NSObject: Any] = [
+      kCVPixelBufferCGImageCompatibilityKey: false,
+      kCVPixelBufferCGBitmapContextCompatibilityKey: false,
+      kCVPixelBufferMetalCompatibilityKey: true,
+      kCVPixelBufferIOSurfacePropertiesKey: [:] as AnyObject
+    ]
+    let _ = CVPixelBufferCreate(kCFAllocatorDefault,
+                                Int(size.width),
+                                Int(size.height),
+                                kCVPixelFormatType_32BGRA,
+                                options as CFDictionary,
+                                &pixelBuffer)
+    CVPixelBufferLockBaseAddress(pixelBuffer!, CVPixelBufferLockFlags(rawValue: 0))
+    let context = CGContext(
+      data: CVPixelBufferGetBaseAddress(pixelBuffer!),
+      width: CVPixelBufferGetWidth(pixelBuffer!),
+      height: CVPixelBufferGetHeight(pixelBuffer!),
+      bitsPerComponent: cgImage!.bitsPerComponent,
+      bytesPerRow: CVPixelBufferGetBytesPerRow(pixelBuffer!),
+      space: cgImage!.colorSpace!,
+      bitmapInfo: cgImage!.bitmapInfo.rawValue
+    )
+    context?.draw(cgImage!, in: CGRect(origin: .zero, size: size))
+    CVPixelBufferUnlockBaseAddress(pixelBuffer!, CVPixelBufferLockFlags(rawValue: 0))
+    
+    return pixelBuffer
+  }
+  
+  var cmSampleBuffer: CMSampleBuffer {
+    let pixelBuffer = cvPixelBuffer
+    var newSampleBuffer: CMSampleBuffer?
+    var timimgInfo: CMSampleTimingInfo = CMSampleTimingInfo.invalid
+    var videoInfo: CMVideoFormatDescription?
+    CMVideoFormatDescriptionCreateForImageBuffer(allocator: nil,
+                                                 imageBuffer: pixelBuffer!,
+                                                 formatDescriptionOut: &videoInfo)
+    CMSampleBufferCreateForImageBuffer(allocator: kCFAllocatorDefault,
+                                       imageBuffer: pixelBuffer!,
+                                       dataReady: true,
+                                       makeDataReadyCallback: nil,
+                                       refcon: nil,
+                                       formatDescription: videoInfo!,
+                                       sampleTiming: &timimgInfo,
+                                       sampleBufferOut: &newSampleBuffer)
+    
+    return newSampleBuffer!
+  }
+}
+
+extension UIView {
+  func asImage() -> UIImage {
+    let renderer = UIGraphicsImageRenderer(bounds: bounds)
+    return renderer.image { rendererContext in
+      layer.render(in: rendererContext.cgContext)
     }
   }
 }
