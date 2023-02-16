@@ -261,6 +261,7 @@ class IVSBroadcastSessionService: NSObject {
   }
   
   private func preInitiation() throws {
+    config.video.enableTransparency = true
     try self.setCustomVideoConfig()
     try self.setCustomAudioConfig()
   }
@@ -323,24 +324,27 @@ class IVSBroadcastSessionService: NSObject {
     self.swapCameraAsync(onReceiveCameraPreview)
   }
   
-  public func addImage(_ view: UIView) throws {
-    if (self.isInitialized()) {
-      let imageSlot = IVSMixerSlotConfiguration()
-      imageSlot.size = view.frame.size
-      imageSlot.position = view.layer.position
-      imageSlot.preferredVideoInput = .userImage
-      imageSlot.preferredAudioInput = .unknown
-      imageSlot.zIndex = 2
-      try imageSlot.setTransparency(0.7)
-      try imageSlot.setName("Test Name")
-      
-      broadcastSession!.mixer.removeSlot(withName: imageSlot.name)
-      broadcastSession!.mixer.addSlot(imageSlot)
-      
-      let imageSource = broadcastSession!.createImageSource(withName: imageSlot.name)
-      broadcastSession!.attach(imageSource, toSlotWithName: imageSlot.name) { _ in
-        imageSource.onSampleBuffer(view.asImage().cmSampleBuffer)
-      }
+  public func addOverlay(_ view: UIView) throws {
+    guard let broadcastSession = broadcastSession else {
+      return
+    }
+    
+    view.frame.size = self.config.video.size
+    
+    let overlaySlot = IVSMixerSlotConfiguration()
+    overlaySlot.size = view.frame.size
+    overlaySlot.preferredVideoInput = .userImage
+    overlaySlot.preferredAudioInput = .unknown
+    overlaySlot.aspect = .fit
+    overlaySlot.zIndex = 2
+    try overlaySlot.setName("overlay")
+    
+    broadcastSession.mixer.removeSlot(withName: overlaySlot.name)
+    broadcastSession.mixer.addSlot(overlaySlot)
+    
+    let imageSource = broadcastSession.createImageSource(withName: overlaySlot.name)
+    broadcastSession.attach(imageSource, toSlotWithName: overlaySlot.name) { _ in
+      imageSource.onSampleBuffer(view.asImage().cmSampleBuffer)
     }
   }
   

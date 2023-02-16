@@ -167,12 +167,14 @@ class IVSBroadcastCameraView: UIView {
   }
   
   private func setupOverlay() {
-    if (self.subviews.count == 0) {
+    let views = self.reactSubviews() ?? []
+    
+    if (views.count == 0) {
       return
     }
     
     do  {
-      try self.subviews.forEach { try self.broadcastSession.addImage($0) }
+      try self.broadcastSession.addOverlay(views[0])
     } catch {
       print("Failed to setup overlay")
     }
@@ -201,13 +203,18 @@ class IVSBroadcastCameraView: UIView {
         UIApplication.shared.isIdleTimerDisabled = true
         self.subscribeToNotificationCenter()
         self.broadcastSession.getCameraPreviewAsync { (preview: UIView) -> Void in
-          self.setupOverlay()
           self.onReceiveCameraPreviewHandler(preview)
           self.onIsBroadcastReady?(["isReady": self.broadcastSession.isReady()])
         }
       } catch {
         self.onErrorHandler(error)
       }
+    }
+  }
+  
+  override func didUpdateReactSubviews() {
+    DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+      self.setupOverlay()
     }
   }
   
