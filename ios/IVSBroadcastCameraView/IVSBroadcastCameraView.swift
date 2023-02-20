@@ -95,7 +95,7 @@ class IVSBroadcastCameraView: UIView {
       self.broadcastSession.setTransmissionStatisticsChangedHandler(onTransmissionStatisticsChanged)
     }
   }
-
+  
   @objc
   private func audioSessionInterrupted(_ notification: Notification) {
     guard let userInfo = notification.userInfo,
@@ -104,12 +104,12 @@ class IVSBroadcastCameraView: UIView {
     else { return }
     
     switch type {
-      case .began:
-        self.onAudioSessionInterrupted?([:])
-      case .ended:
-        self.onAudioSessionResumed?([:])
-      @unknown default:
-        break
+    case .began:
+      self.onAudioSessionInterrupted?([:])
+    case .ended:
+      self.onAudioSessionResumed?([:])
+    @unknown default:
+      break
     }
   }
   
@@ -166,6 +166,20 @@ class IVSBroadcastCameraView: UIView {
     ])
   }
   
+  private func setupOverlay() {
+    let views = self.reactSubviews() ?? []
+    
+    if (views.count == 0) {
+      return
+    }
+    
+    do  {
+      try self.broadcastSession.addOverlay(views[0])
+    } catch {
+      print("Failed to setup overlay")
+    }
+  }
+  
   override init(frame: CGRect) {
     super.init(frame: frame)
   }
@@ -198,15 +212,21 @@ class IVSBroadcastCameraView: UIView {
     }
   }
   
+  override func didUpdateReactSubviews() {
+    DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+      self.setupOverlay()
+    }
+  }
+  
   public func start(_ options: NSDictionary) {
     let rtmpsUrl = options["rtmpsUrl"] != nil ? options["rtmpsUrl"] : self.rtmpsUrl
     let streamKey = options["streamKey"] != nil ? options["streamKey"] : self.streamKey
-
+    
     guard let finalRtmpsUrl = rtmpsUrl else {
       assertionFailure("'rtmpsUrl' is empty.")
       return
     }
-
+    
     guard let finalStreamKey = streamKey else {
       assertionFailure("'streamKey' is empty.")
       return
