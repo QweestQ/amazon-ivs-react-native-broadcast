@@ -24,6 +24,7 @@ class IVSBroadcastSessionService: NSObject {
   
   private var broadcastSession: IVSBroadcastSession?
   private var config = IVSBroadcastConfiguration()
+  private var overlaySource: IVSCustomImageSource?
   
   private var onBroadcastError: RCTDirectEventBlock?
   private var onBroadcastAudioStats: RCTDirectEventBlock?
@@ -261,7 +262,6 @@ class IVSBroadcastSessionService: NSObject {
   }
   
   private func preInitiation() throws {
-    config.video.enableTransparency = true
     try self.setCustomVideoConfig()
     try self.setCustomAudioConfig()
   }
@@ -277,6 +277,7 @@ class IVSBroadcastSessionService: NSObject {
   public func initiate() throws {
     if (!self.isInitialized()) {
       try self.preInitiation()
+      config.video.enableTransparency = true
       let initialDeviceDescriptorList = getInitialDeviceDescriptorList()
       
       self.broadcastSession = try IVSBroadcastSession(
@@ -329,22 +330,27 @@ class IVSBroadcastSessionService: NSObject {
       return
     }
     
-    view.frame.size = self.config.video.size
-    
     let overlaySlot = IVSMixerSlotConfiguration()
-    overlaySlot.size = view.frame.size
+    overlaySlot.size = config.video.size
     overlaySlot.preferredVideoInput = .userImage
     overlaySlot.preferredAudioInput = .unknown
-    overlaySlot.aspect = .fit
+    overlaySlot.aspect = .fill
     overlaySlot.zIndex = 2
     try overlaySlot.setName("overlay")
     
     broadcastSession.mixer.removeSlot(withName: overlaySlot.name)
     broadcastSession.mixer.addSlot(overlaySlot)
     
-    let imageSource = broadcastSession.createImageSource(withName: overlaySlot.name)
-    broadcastSession.attach(imageSource, toSlotWithName: overlaySlot.name) { _ in
-      imageSource.onSampleBuffer(view.asImage().cmSampleBuffer)
+    if let overlaySource = self.overlaySource {
+      broadcastSession.detach(overlaySource) {
+        self.overlaySource = nil
+      }
+    }
+    
+    let overlaySource = broadcastSession.createImageSource(withName: overlaySlot.name)
+    broadcastSession.attach(overlaySource, toSlotWithName: overlaySlot.name) { _ in
+      overlaySource.onSampleBuffer(view.asImage().cmSampleBuffer)
+      self.overlaySource = overlaySource
     }
   }
   
@@ -528,58 +534,62 @@ extension IVSBroadcastSessionService: IVSBroadcastSession.Delegate {
 extension UIImage {
   var cvPixelBuffer: CVPixelBuffer? {
     var pixelBuffer: CVPixelBuffer? = nil
-    let options: [NSObject: Any] = [
-      kCVPixelBufferCGImageCompatibilityKey: false,
-      kCVPixelBufferCGBitmapContextCompatibilityKey: false,
-      kCVPixelBufferMetalCompatibilityKey: true,
-      kCVPixelBufferIOSurfacePropertiesKey: [:] as AnyObject
-    ]
-    let _ = CVPixelBufferCreate(kCFAllocatorDefault,
-                                Int(size.width),
-                                Int(size.height),
-                                kCVPixelFormatType_32BGRA,
-                                options as CFDictionary,
-                                &pixelBuffer)
-    CVPixelBufferLockBaseAddress(pixelBuffer!, CVPixelBufferLockFlags(rawValue: 0))
-    let context = CGContext(
-      data: CVPixelBufferGetBaseAddress(pixelBuffer!),
-      width: CVPixelBufferGetWidth(pixelBuffer!),
-      height: CVPixelBufferGetHeight(pixelBuffer!),
-      bitsPerComponent: cgImage!.bitsPerComponent,
-      bytesPerRow: CVPixelBufferGetBytesPerRow(pixelBuffer!),
-      space: cgImage!.colorSpace!,
-      bitmapInfo: cgImage!.bitmapInfo.rawValue
-    )
-    context?.draw(cgImage!, in: CGRect(origin: .zero, size: size))
-    CVPixelBufferUnlockBaseAddress(pixelBuffer!, CVPixelBufferLockFlags(rawValue: 0))
+    let options = [
+      kCVPixelBufferCGImageCompatibilityKey: kCFBooleanTrue,
+      kCVPixelBufferCGBitmapContextCompatibilityKey: kCFBooleanTrue,
+      kCVPixelBufferMetalCompatibilityKey: kCFBooleanTrue,
+    ] as CFDictionary
     
-    return pixelBuffer
+    CVPixelBufferCreate(kCFAllocatorDefault,
+                        Int(size.width),
+                        Int(size.height),
+                        kCVPixelFormatType_32BGRA,
+                        options as CFDictionary,
+                        &pixelBuffer)
+    
+    guard let pb = pixelBuffer else {
+      print("⚠️⚠️ Couldn't create pixel buffer ⚠️⚠️")
+      return nil
+    }
+    
+    let context = CIContext(options: [.workingColorSpace: NSNull()])
+    
+    guard let cgImage = self.cgImage else {
+      print("⚠️⚠️ Couldn't load bundled image assets ⚠️⚠️")
+      return nil
+    }
+    
+    let ciImage = CIImage(cgImage: cgImage)
+    context.render(ciImage, to: pb)
+    
+    return pb
   }
   
   var cmSampleBuffer: CMSampleBuffer {
     let pixelBuffer = cvPixelBuffer
-    var newSampleBuffer: CMSampleBuffer?
+    var sampleBuffer: CMSampleBuffer? = nil
+    var formatDesc: CMFormatDescription? = nil
     var timimgInfo: CMSampleTimingInfo = CMSampleTimingInfo.invalid
-    var videoInfo: CMVideoFormatDescription?
-    CMVideoFormatDescriptionCreateForImageBuffer(allocator: nil,
+    CMVideoFormatDescriptionCreateForImageBuffer(allocator: kCFAllocatorDefault,
                                                  imageBuffer: pixelBuffer!,
-                                                 formatDescriptionOut: &videoInfo)
-    CMSampleBufferCreateForImageBuffer(allocator: kCFAllocatorDefault,
-                                       imageBuffer: pixelBuffer!,
-                                       dataReady: true,
-                                       makeDataReadyCallback: nil,
-                                       refcon: nil,
-                                       formatDescription: videoInfo!,
-                                       sampleTiming: &timimgInfo,
-                                       sampleBufferOut: &newSampleBuffer)
+                                                 formatDescriptionOut: &formatDesc)
     
-    return newSampleBuffer!
+    CMSampleBufferCreateReadyWithImageBuffer(allocator: kCFAllocatorDefault,
+                                             imageBuffer: cvPixelBuffer!,
+                                             formatDescription: formatDesc!,
+                                             sampleTiming: &timimgInfo,
+                                             sampleBufferOut: &sampleBuffer)
+    
+    return sampleBuffer!
   }
 }
 
 extension UIView {
   func asImage() -> UIImage {
-    let renderer = UIGraphicsImageRenderer(bounds: bounds)
+    let format = UIGraphicsImageRendererFormat()
+    format.scale = 1
+    
+    let renderer = UIGraphicsImageRenderer(bounds: bounds, format: format)
     return renderer.image { rendererContext in
       layer.render(in: rendererContext.cgContext)
     }
