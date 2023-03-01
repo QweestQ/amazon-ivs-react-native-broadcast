@@ -166,20 +166,6 @@ class IVSBroadcastCameraView: UIView {
     ])
   }
   
-  private func setupOverlay() {
-    let views = self.reactSubviews() ?? []
-    
-    if (views.count == 0) {
-      return
-    }
-    
-    do  {
-      try self.broadcastSession.addOverlay(views[0])
-    } catch {
-      print("Failed to setup overlay")
-    }
-  }
-  
   override init(frame: CGRect) {
     super.init(frame: frame)
   }
@@ -212,12 +198,6 @@ class IVSBroadcastCameraView: UIView {
     }
   }
   
-  override func didUpdateReactSubviews() {
-    DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
-      self.setupOverlay()
-    }
-  }
-  
   public func start(_ options: NSDictionary) {
     let rtmpsUrl = options["rtmpsUrl"] != nil ? options["rtmpsUrl"] : self.rtmpsUrl
     let streamKey = options["streamKey"] != nil ? options["streamKey"] : self.streamKey
@@ -241,6 +221,22 @@ class IVSBroadcastCameraView: UIView {
   
   public func stop() {
     self.broadcastSession.stop()
+  }
+  
+  public func reloadOverlay() {
+    let views = self.reactSubviews() ?? []
+    
+    if (views.count == 0) {
+      return
+    }
+    
+    do  {
+      try views.indices.forEach {
+        try self.broadcastSession.addSlot(views[$0], name: "Overlay slot \($0)")
+      }
+    } catch {
+      print("Failed to setup overlay")
+    }
   }
   
   @available(*, message: "@Deprecated in favor of cameraPosition prop.")
