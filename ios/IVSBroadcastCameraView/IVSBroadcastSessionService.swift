@@ -24,7 +24,7 @@ class IVSBroadcastSessionService: NSObject {
   
   private var broadcastSession: IVSBroadcastSession?
   private var config = IVSBroadcastConfiguration()
-  private var overlaySource: IVSCustomImageSource?
+  private var slotSources: Dictionary<String, IVSCustomImageSource> = [:]
   
   private var onBroadcastError: RCTDirectEventBlock?
   private var onBroadcastAudioStats: RCTDirectEventBlock?
@@ -325,32 +325,38 @@ class IVSBroadcastSessionService: NSObject {
     self.swapCameraAsync(onReceiveCameraPreview)
   }
   
-  public func addOverlay(_ view: UIView) throws {
+  public func addSlot(_ view: UIView, name: String) throws {
     guard let broadcastSession = broadcastSession else {
       return
     }
     
-    let overlaySlot = IVSMixerSlotConfiguration()
-    overlaySlot.size = config.video.size
-    overlaySlot.preferredVideoInput = .userImage
-    overlaySlot.preferredAudioInput = .unknown
-    overlaySlot.aspect = .fill
-    overlaySlot.zIndex = 2
-    try overlaySlot.setName("overlay")
+    let slot = IVSMixerSlotConfiguration()
+    slot.preferredVideoInput = .userImage
+    slot.preferredAudioInput = .unknown
+    slot.aspect = .fit
+    slot.zIndex = 2
+    try slot.setName(name)
     
-    broadcastSession.mixer.removeSlot(withName: overlaySlot.name)
-    broadcastSession.mixer.addSlot(overlaySlot)
+    // Since view dimensions are different from config.video dimensions - values needed to be
+    // adjusted before assigning them to slot.
+    slot.size.width = view.frame.width / UIScreen.main.bounds.width * self.config.video.size.width
+    slot.size.height = view.frame.height / UIScreen.main.bounds.height * self.config.video.size.height
     
-    if let overlaySource = self.overlaySource {
-      broadcastSession.detach(overlaySource) {
-        self.overlaySource = nil
+    slot.position.x = view.layer.position.x / UIScreen.main.bounds.width * self.config.video.size.width - view.frame.width / 2
+    slot.position.y = view.layer.position.y / UIScreen.main.bounds.height * self.config.video.size.height - view.frame.height / 2
+    
+    broadcastSession.mixer.addSlot(slot)
+    
+    if let source = self.slotSources[slot.name] {
+      broadcastSession.detach(source) {
+        self.slotSources[slot.name] = nil
       }
     }
     
-    let overlaySource = broadcastSession.createImageSource(withName: overlaySlot.name)
-    broadcastSession.attach(overlaySource, toSlotWithName: overlaySlot.name) { _ in
-      overlaySource.onSampleBuffer(view.asImage().cmSampleBuffer)
-      self.overlaySource = overlaySource
+    let source = broadcastSession.createImageSource(withName: slot.name)
+    broadcastSession.attach(source, toSlotWithName: slot.name) { _ in
+      source.onSampleBuffer(view.asImage().cmSampleBuffer)
+      self.slotSources[slot.name] = source
     }
   }
   
