@@ -10,6 +10,7 @@ export type ExtractComponentProps<T> = T extends
 export enum Command {
   Start = 'START',
   Stop = 'STOP',
+  ReloadOverlay = 'RELOAD_OVERLAY',
   /**
    * @deprecated in favor of {@link CameraPosition}
    */

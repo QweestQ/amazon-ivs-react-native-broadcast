@@ -92,6 +92,7 @@ const IVSBroadcastCameraView = forwardRef<
           options: Parameters<IIVSBroadcastCameraView['start']>[number] = {}
         ) => dispatchViewManagerCommand(Command.Start, options),
         stop: () => dispatchViewManagerCommand(Command.Stop),
+        reloadOverlay: () => dispatchViewManagerCommand(Command.ReloadOverlay),
         /**
          * @deprecated in favor of {@link cameraPosition}
          */
