@@ -32,13 +32,5 @@ class IVSBroadcastCameraViewManager: RCTViewManager {
       component.reloadOverlay()
     }
   }
-  
-  @available(*, message: "@Deprecated in favor of cameraPosition prop.")
-  @objc public func SWAP_CAMERA(_ node: NSNumber) {
-    DispatchQueue.main.async {
-      let component = self.bridge.uiManager.view(forReactTag: node) as! IVSBroadcastCameraView
-      component.swapCamera()
-    }
-  }
 }
 

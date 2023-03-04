@@ -11,10 +11,6 @@ export enum Command {
   Start = 'START',
   Stop = 'STOP',
   ReloadOverlay = 'RELOAD_OVERLAY',
-  /**
-   * @deprecated in favor of {@link CameraPosition}
-   */
-  SwapCamera = 'SWAP_CAMERA',
 }
 
 export enum StateStatusEnum {
@@ -231,8 +227,5 @@ type StartMethodOptions = Pick<IBaseProps, 'rtmpsUrl' | 'streamKey'>;
 export interface IIVSBroadcastCameraView {
   start(options?: StartMethodOptions): void;
   stop(): void;
-  /**
-   * @deprecated in favor of {@link CameraPosition}
-   */
-  swapCamera(): void;
+  reloadOverlay(): void;
 }

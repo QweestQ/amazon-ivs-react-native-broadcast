@@ -63,7 +63,6 @@ const IVSBroadcastCameraView = forwardRef<
     onMediaServicesWereReset,
     isMuted = false,
     isCameraPreviewMirrored = false,
-    cameraPosition = 'back',
     cameraPreviewAspectMode = 'none',
     logLevel = 'error',
     sessionLogLevel = 'error',
@@ -93,18 +92,14 @@ const IVSBroadcastCameraView = forwardRef<
         ) => dispatchViewManagerCommand(Command.Start, options),
         stop: () => dispatchViewManagerCommand(Command.Stop),
         reloadOverlay: () => dispatchViewManagerCommand(Command.ReloadOverlay),
-        /**
-         * @deprecated in favor of {@link cameraPosition}
-         */
-        swapCamera: () => dispatchViewManagerCommand(Command.SwapCamera),
       };
     },
     []
   );
 
   const onErrorHandler: IIVSBroadcastCameraNativeViewProps['onError'] = ({
-    nativeEvent,
-  }) => onError?.(nativeEvent.message);
+                                                                           nativeEvent,
+                                                                         }) => onError?.(nativeEvent.message);
 
   const onBroadcastErrorHandler: IIVSBroadcastCameraNativeViewProps['onBroadcastError'] =
     ({ nativeEvent }) => {
@@ -192,7 +187,6 @@ const IVSBroadcastCameraView = forwardRef<
       sessionLogLevel={sessionLogLevel}
       cameraPreviewAspectMode={cameraPreviewAspectMode}
       isCameraPreviewMirrored={isCameraPreviewMirrored}
-      cameraPosition={cameraPosition}
       onError={onErrorHandler}
       onBroadcastError={onBroadcastErrorHandler}
       onIsBroadcastReady={onIsBroadcastReadyHandler}

@@ -132,14 +132,6 @@ Flips the camera preview horizontally.
 | :-------: | :------: | :----------: | :-----------: |
 | `boolean` |    No    | iOS, Android |    `false`    |
 
-#### `cameraPosition`
-
-The position of the input camera relative to the host device. Can be used to swap camera during session live.
-
-|                     Type                      | Required |   Platform   | Default value |
-| :-------------------------------------------: | :------: | :----------: | :-----------: |
-| [`CameraPosition`](./types.md#cameraposition) |    No    | iOS, Android |    `back`     |
-
 #### `isMuted`
 
 Puts the active microphone on mute.
@@ -293,12 +285,3 @@ Stop the broadcast session, but do not deallocate resources.
 
 ⚠️ _Stopping the stream happens asynchronously while the SDK attempts to gracefully end the broadcast. Observe state changes to know when a new stream could be started._
 
-#### `swapCamera`
-
-🚧 **DEPRECATED** in favor of declarative way using [`cameraPosition`](./api-documentation.md#cameraposition) prop.
-
-Swap back camera to front camera and vice versa.
-
-|    Type    | Required |   Platform   |
-| :--------: | :------: | :----------: |
-| `(): void` |    No    | iOS, Android |

@@ -13,7 +13,7 @@ class IVSBroadcastCameraView: UIView {
   }
   @objc var zoom: NSNumber = 1 {
     didSet {
-      self.broadcastSession.setZoom(zoom)
+      self.broadcastSession.setZoom(CGFloat(truncating: zoom))
     }
   }
   @objc var isCameraPreviewMirrored: Bool = false {
@@ -24,11 +24,6 @@ class IVSBroadcastCameraView: UIView {
   @objc var cameraPreviewAspectMode: NSString? {
     didSet {
       self.broadcastSession.setCameraPreviewAspectMode(cameraPreviewAspectMode, self.onReceiveCameraPreviewHandler)
-    }
-  }
-  @objc var cameraPosition: NSString? {
-    didSet {
-      self.broadcastSession.setCameraPosition(cameraPosition, self.onReceiveCameraPreviewHandler)
     }
   }
   @objc var sessionLogLevel: NSString? {
@@ -237,10 +232,5 @@ class IVSBroadcastCameraView: UIView {
     } catch {
       print("Failed to setup overlay")
     }
-  }
-  
-  @available(*, message: "@Deprecated in favor of cameraPosition prop.")
-  public func swapCamera() {
-    self.broadcastSession.swapCamera(self.onReceiveCameraPreviewHandler)
   }
 }
