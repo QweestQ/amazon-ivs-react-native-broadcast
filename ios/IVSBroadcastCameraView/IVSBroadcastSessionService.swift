@@ -4,27 +4,25 @@ import AVFoundation
 typealias onReceiveCameraPreviewHandler = (_: IVSImagePreviewView) -> Void
 
 enum BuiltInCameraUrns: String {
-  case backUltraWideCamera = "com.apple.avfoundation.avcapturedevice.built-in_video:5"
-  case backCamera = "com.apple.avfoundation.avcapturedevice.built-in_video:0"
-  case frontCamera = "com.apple.avfoundation.avcapturedevice.built-in_video:1"
+  case backUltraWideCamera = "camera:com.apple.avfoundation.avcapturedevice.built-in_video:5"
+  case backCamera = "camera:com.apple.avfoundation.avcapturedevice.built-in_video:0"
+  case frontCamera = "camera:com.apple.avfoundation.avcapturedevice.built-in_video:1"
 }
 
 // Guide: https://docs.aws.amazon.com/ivs/latest/userguide//broadcast-ios.html
 class IVSBroadcastSessionService: NSObject {
   private var isInitialMuted: Bool = false
   private var initialSessionLogLevel: IVSBroadcastSession.LogLevel = .error
-  private var initialCameraPosition: IVSDevicePosition = IVSDevicePosition.back
   private var isCameraPreviewMirrored: Bool = false
   private var cameraPreviewAspectMode: IVSBroadcastConfiguration.AspectMode = .none
   private var customVideoConfig: NSDictionary?
   private var customAudioConfig: NSDictionary?
   
-  private var attachedCameraUrn: String = ""
-  private var attachedMicrophoneUrn: String = ""
-  
   private var broadcastSession: IVSBroadcastSession?
   private var config = IVSBroadcastConfiguration()
+  private var cameraSlot: IVSMixerSlotConfiguration!
   private var slotSources: Dictionary<String, IVSCustomImageSource> = [:]
+  private var attachedCamera: IVSDevice?
   
   private var onBroadcastError: RCTDirectEventBlock?
   private var onBroadcastAudioStats: RCTDirectEventBlock?
@@ -62,18 +60,6 @@ class IVSBroadcastSessionService: NSObject {
     default:
       assertionFailure("Does not support aspect mode: \(aspectModeName)")
       return .fill
-    }
-  }
-  
-  private func getCameraPosition(_ cameraPositionName: NSString) -> IVSDevicePosition {
-    switch(cameraPositionName) {
-    case "front":
-      return .front
-    case "back":
-      return .back
-    default:
-      assertionFailure("Does not support camera position: \(cameraPositionName)")
-      return .back
     }
   }
   
@@ -139,31 +125,10 @@ class IVSBroadcastSessionService: NSObject {
     }
   }
   
-  private func getInitialDeviceDescriptorList() -> [IVSDeviceDescriptor] {
-    return self.initialCameraPosition == .front ? IVSPresets.devices().frontCamera() : IVSPresets.devices().backCamera()
-  }
-  
-  private func getNextCameraDescriptorToSwap(_ attachedCamera : IVSDevice) -> IVSDeviceDescriptor? {
-    let attachedCameraPosition = attachedCamera.descriptor().position
-    let availableCameraDevices = IVSBroadcastSession.listAvailableDevices().filter { $0.type == .camera }
-    
-    return availableCameraDevices
-      .first {
-        let isOppositePosition = $0.position != attachedCameraPosition
-        return availableCameraDevices.count > 2 && attachedCameraPosition == .front ? isOppositePosition && $0.isDefault : isOppositePosition
-      }
-  }
-  
   private func getCameraPreview() -> IVSImagePreviewView? {
     let preview = try? self.broadcastSession?.previewView(with: self.cameraPreviewAspectMode)
     preview?.setMirrored(self.isCameraPreviewMirrored)
     return preview
-  }
-  
-  private func getAttachedDeviceByUrn(_ urn: String) -> IVSDevice? {
-    let attachedDevices = self.broadcastSession?.listAttachedDevices()
-    let wantedDeviceList = attachedDevices?.filter { $0.descriptor().urn.contains(urn) }
-    return wantedDeviceList?.first
   }
   
   private func setCustomVideoConfig() throws {
@@ -224,41 +189,47 @@ class IVSBroadcastSessionService: NSObject {
     }
   }
   
-  private func swapCameraAsync(_ onReceiveCameraPreview: @escaping onReceiveCameraPreviewHandler) {
-    self.broadcastSession?.awaitDeviceChanges { () -> Void in
-      guard let attachedCamera = self.getAttachedDeviceByUrn(self.attachedCameraUrn) else {
-        return
-      }
-      
-      guard let nextCameraDescriptorToSwap = self.getNextCameraDescriptorToSwap(attachedCamera) else {
-        return
-      }
-      
-      self.broadcastSession?.exchangeOldDevice(attachedCamera, withNewDevice: nextCameraDescriptorToSwap) { newDevice, _ in
-        if let newCamera = newDevice {
-          self.attachedCameraUrn = newCamera.descriptor().urn
-          
-          if let newCameraPreview = self.getCameraPreview() {
-            onReceiveCameraPreview(newCameraPreview)
-          }
-        }
-      }
-    }
-  }
-  
   private func muteAsync(_ isMuted: Bool) {
-    self.broadcastSession?.awaitDeviceChanges { () -> Void in
-      if let attachedMicrophone = self.getAttachedDeviceByUrn(self.attachedMicrophoneUrn) {
-        let gain: Float = isMuted ? 0 : 1
-        (attachedMicrophone as? IVSAudioDevice)?.setGain(gain)
-      }
+    self.broadcastSession?.awaitDeviceChanges({ [weak self] in
+      self?.broadcastSession?.listAttachedDevices()
+        .filter({ $0.descriptor().type == .microphone || $0.descriptor().type == .userAudio })
+        .forEach({
+          if let microphone = $0 as? IVSAudioDevice {
+            microphone.setGain(isMuted ? 0 : 1)
+          }
+        })
+    })
+  }
+  
+  private func attachCamera(urn: BuiltInCameraUrns) {
+    IVSBroadcastSession.listAvailableDevices().forEach { print("urn: " + $0.urn) }
+    guard let activeCamera = IVSBroadcastSession.listAvailableDevices().first(where: { $0.urn == urn.rawValue }) else { return }
+    
+    let onComplete: ((IVSDevice?, Error?) -> Void)? = { [weak self] device, error in
+      if let error = error { print("❌ Error attaching/exchanging camera: \(error)") }
+      self?.attachedCamera = device
+    }
+    
+    if let attachedCamera = self.attachedCamera {
+      self.broadcastSession?.exchangeOldDevice(attachedCamera, withNewDevice: activeCamera, onComplete: onComplete)
+    } else {
+      self.broadcastSession?.attach(activeCamera, toSlotWithName: self.cameraSlot.name, onComplete: onComplete)
     }
   }
   
-  private func saveInitialDevicesUrn(_ initialDescriptors: [IVSDeviceDescriptor]) {
-    let attachedDevices = initialDescriptors.filter { $0.type == .camera || $0.type == .microphone }
-    self.attachedCameraUrn = attachedDevices.first { $0.type == .camera }?.urn ?? ""
-    self.attachedMicrophoneUrn = attachedDevices.first { $0.type == .microphone }?.urn ?? ""
+  private func attachMicrophone() {
+    guard let microphone = IVSBroadcastSession.listAvailableDevices().first(where: { $0.type == .microphone }) else {
+      print("Cannot attach microphone - no available device with type microphone found")
+      return
+    }
+    
+    self.broadcastSession?.attach(microphone, toSlotWithName: cameraSlot.name, onComplete: { (device, error)  in
+      if let error = error {
+          print("❌ Error attaching device microphone to session: \(error)")
+      }
+
+      self.muteAsync(self.isInitialMuted)
+    })
   }
   
   private func preInitiation() throws {
@@ -272,21 +243,30 @@ class IVSBroadcastSessionService: NSObject {
     if (self.isInitialMuted) {
       self.muteAsync(self.isInitialMuted)
     }
+    
+    self.attachCamera(urn: BuiltInCameraUrns.backCamera)
+    self.attachMicrophone()
   }
   
   public func initiate() throws {
     if (!self.isInitialized()) {
       try self.preInitiation()
+      
+      cameraSlot = IVSMixerSlotConfiguration()
+      cameraSlot.preferredVideoInput = .camera
+      cameraSlot.preferredAudioInput = .microphone
+      cameraSlot.zIndex = 1
+      try cameraSlot.setName("camera")
+      
+      config.mixer.slots = [cameraSlot]
       config.video.enableTransparency = true
-      let initialDeviceDescriptorList = getInitialDeviceDescriptorList()
       
       self.broadcastSession = try IVSBroadcastSession(
         configuration: self.config,
-        descriptors: initialDeviceDescriptorList,
+        descriptors: nil,
         delegate: self
       )
       
-      self.saveInitialDevicesUrn(initialDeviceDescriptorList)
       self.postInitiation()
     } else {
       assertionFailure("Broadcast session has been already initialized.")
@@ -318,11 +298,6 @@ class IVSBroadcastSessionService: NSObject {
   
   public func stop() {
     self.broadcastSession?.stop()
-  }
-  
-  @available(*, message: "@Deprecated in favor of setCameraPosition method.")
-  public func swapCamera(_ onReceiveCameraPreview: @escaping onReceiveCameraPreviewHandler) {
-    self.swapCameraAsync(onReceiveCameraPreview)
   }
   
   public func addSlot(_ view: UIView, name: String) throws {
@@ -368,16 +343,6 @@ class IVSBroadcastSessionService: NSObject {
     }
   }
   
-  public func setCameraPosition(_ cameraPosition: NSString?, _ onReceiveCameraPreview: @escaping onReceiveCameraPreviewHandler) {
-    if let cameraPositionName = cameraPosition {
-      if (self.isInitialized()) {
-        self.swapCameraAsync(onReceiveCameraPreview)
-      } else {
-        self.initialCameraPosition = self.getCameraPosition(cameraPositionName)
-      }
-    }
-  }
-  
   public func setCameraPreviewAspectMode(_ aspectMode: NSString?, _ onReceiveCameraPreview: @escaping onReceiveCameraPreviewHandler) {
     if let aspectModeName = aspectMode {
       self.cameraPreviewAspectMode = self.getAspectMode(aspectModeName)
@@ -404,12 +369,33 @@ class IVSBroadcastSessionService: NSObject {
     }
   }
   
-  public func setZoom(_ zoom: NSNumber) {
-    let camera = AVCaptureDevice.default(
-      .builtInWideAngleCamera,
-      for: AVMediaType.video,
-      position: .back
-    )
+  public func setZoom(_ zoom: CGFloat) {
+    var camera: AVCaptureDevice?
+    var zoom = zoom
+    
+    // Support of 0.5x...1x zoom
+    if #available(iOS 13.0, *), zoom >= 0.5, zoom < 1 {
+      if self.attachedCamera?.descriptor().urn == BuiltInCameraUrns.backCamera.rawValue {
+        self.attachCamera(urn: BuiltInCameraUrns.backUltraWideCamera)
+      }
+      
+      zoom += 0.5
+      camera = AVCaptureDevice.default(
+        .builtInUltraWideCamera,
+        for: .video,
+        position: .back
+      )
+    } else if zoom >= 1 {
+      if self.attachedCamera?.descriptor().urn == BuiltInCameraUrns.backUltraWideCamera.rawValue {
+        self.attachCamera(urn: BuiltInCameraUrns.backCamera)
+      }
+      
+      camera = AVCaptureDevice.default(
+        .builtInWideAngleCamera,
+        for: .video,
+        position: .back
+      )
+    }
     
     do {
       try camera?.lockForConfiguration()
@@ -417,7 +403,7 @@ class IVSBroadcastSessionService: NSObject {
       return
     }
     
-    camera?.ramp(toVideoZoomFactor: CGFloat(truncating: zoom), withRate: 3)
+    camera?.ramp(toVideoZoomFactor: zoom, withRate: 5)
   }
   
   public func setSessionLogLevel(_ logLevel: NSString?) {
