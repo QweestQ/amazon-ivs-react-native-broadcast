@@ -23,7 +23,7 @@ type IVSBroadcastCameraViewPartialProps = Partial<
   ExtractComponentProps<typeof IVSBroadcastCameraView>
 >;
 
-const { Start, Stop, SwapCamera } = Command;
+const { Start, Stop } = Command;
 
 function nativeSyntheticEventFactory<TName extends keyof INativeEventHandlers>(
   nativeEvent?: Parameters<
@@ -305,10 +305,6 @@ describe('Static methods should be called with the correct command names', () =>
   test.each([
     { methodName: 'start' as const, commandName: Start },
     { methodName: 'stop' as const, commandName: Stop },
-    /**
-     * @deprecated in favor of 'cameraPosition' prop.
-     */
-    { methodName: 'swapCamera' as const, commandName: SwapCamera },
   ])('$methodName', ({ methodName, commandName }) => {
     renderIVSBroadcastCameraView({ ref: ivsBroadcastCameraViewRef });
 

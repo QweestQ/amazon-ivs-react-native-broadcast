@@ -14,7 +14,6 @@ import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 
 import { rtmpsUrl, streamKey } from '../app.json';
 import {
-  CameraPosition,
   CameraPreviewAspectMode,
   NetworkHealth,
   BroadcastQuality,
@@ -78,7 +77,6 @@ const App: FC = () => {
   const [isMuted, setIsMuted] = useState(true);
   const [isMirrored, setIsMirrored] = useState(false);
   const [aspectMode, setAspectMode] = useState<CameraPreviewAspectMode>('none');
-  const [cameraPosition, setCameraPosition] = useState<CameraPosition>('back');
 
   const [{ stateStatus, readyStatus }, setState] = useState<{
     readonly stateStatus: StateStatusUnion;
@@ -200,14 +198,6 @@ const App: FC = () => {
     []
   );
 
-  const onPressSwapCameraButtonHandler = useCallback(
-    () =>
-      setCameraPosition(currentPosition =>
-        currentPosition === 'back' ? 'front' : 'back'
-      ),
-    []
-  );
-
   const onPressMuteButtonHandler = useCallback(
     () => setIsMuted(currentIsMuted => !currentIsMuted),
     []
@@ -237,7 +227,6 @@ const App: FC = () => {
         audioConfig={AUDIO_CONFIG}
         isMuted={isMuted}
         isCameraPreviewMirrored={isMirrored}
-        cameraPosition={cameraPosition}
         cameraPreviewAspectMode={aspectMode}
         onError={onErrorHandler}
         onBroadcastError={onBroadcastErrorHandler}
@@ -278,10 +267,6 @@ const App: FC = () => {
                     <Button
                       title="Toggle mirroring"
                       onPress={onPressMirrorButtonHandler}
-                    />
-                    <Button
-                      title="Swap"
-                      onPress={onPressSwapCameraButtonHandler}
                     />
                     {isConnected && (
                       <Button title="Stop" onPress={onPressStopButtonHandler} />
