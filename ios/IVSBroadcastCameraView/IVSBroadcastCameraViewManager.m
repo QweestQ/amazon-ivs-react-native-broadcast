@@ -7,6 +7,7 @@ RCT_EXPORT_VIEW_PROPERTY(streamKey, NSString)
 RCT_EXPORT_VIEW_PROPERTY(rtmpsUrl, NSString)
 RCT_EXPORT_VIEW_PROPERTY(videoConfig, NSDictionary)
 RCT_EXPORT_VIEW_PROPERTY(audioConfig, NSDictionary)
+RCT_EXPORT_VIEW_PROPERTY(overlayConfig, NSArray<NSDictionary>)
 RCT_EXPORT_VIEW_PROPERTY(configurationPreset, NSString)
 RCT_EXPORT_VIEW_PROPERTY(isMuted, BOOL)
 RCT_EXPORT_VIEW_PROPERTY(zoom, NSNumber)
@@ -34,5 +35,4 @@ RCT_EXPORT_VIEW_PROPERTY(onTransmissionStatisticsChanged, RCTDirectEventBlock)
 // Methods
 RCT_EXTERN_METHOD(START:(nonnull NSNumber *)node options:(NSDictionary)options)
 RCT_EXTERN_METHOD(STOP:(nonnull NSNumber *)node)
-RCT_EXTERN_METHOD(RELOAD_OVERLAY:(nonnull NSNumber *)node)
 @end

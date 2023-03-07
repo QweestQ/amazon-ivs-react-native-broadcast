@@ -61,6 +61,7 @@ const IVSBroadcastCameraView = forwardRef<
     onAudioSessionResumed,
     onMediaServicesWereLost,
     onMediaServicesWereReset,
+    zoom = 1,
     isMuted = false,
     isCameraPreviewMirrored = false,
     cameraPreviewAspectMode = 'none',
@@ -91,15 +92,14 @@ const IVSBroadcastCameraView = forwardRef<
           options: Parameters<IIVSBroadcastCameraView['start']>[number] = {}
         ) => dispatchViewManagerCommand(Command.Start, options),
         stop: () => dispatchViewManagerCommand(Command.Stop),
-        reloadOverlay: () => dispatchViewManagerCommand(Command.ReloadOverlay),
       };
     },
     []
   );
 
   const onErrorHandler: IIVSBroadcastCameraNativeViewProps['onError'] = ({
-                                                                           nativeEvent,
-                                                                         }) => onError?.(nativeEvent.message);
+    nativeEvent,
+  }) => onError?.(nativeEvent.message);
 
   const onBroadcastErrorHandler: IIVSBroadcastCameraNativeViewProps['onBroadcastError'] =
     ({ nativeEvent }) => {
@@ -182,6 +182,7 @@ const IVSBroadcastCameraView = forwardRef<
       testID={NATIVE_VIEW_NAME}
       {...restProps}
       ref={nativeViewRef}
+      zoom={zoom}
       isMuted={isMuted}
       logLevel={logLevel}
       sessionLogLevel={sessionLogLevel}

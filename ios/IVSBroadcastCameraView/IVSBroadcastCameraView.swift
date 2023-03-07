@@ -51,6 +51,11 @@ class IVSBroadcastCameraView: UIView {
       self.broadcastSession.setAudioConfig(audioConfig)
     }
   }
+  @objc var overlayConfig: [NSDictionary]? {
+    didSet {
+      self.broadcastSession.setOverlayConfig(overlayConfig)
+    }
+  }
   
   @objc var onIsBroadcastReady: RCTDirectEventBlock?
   @objc var onAudioSessionInterrupted: RCTDirectEventBlock?
@@ -216,21 +221,5 @@ class IVSBroadcastCameraView: UIView {
   
   public func stop() {
     self.broadcastSession.stop()
-  }
-  
-  public func reloadOverlay() {
-    let views = self.reactSubviews() ?? []
-    
-    if (views.count == 0) {
-      return
-    }
-    
-    do  {
-      try views.indices.forEach {
-        try self.broadcastSession.addSlot(views[$0], name: "Overlay slot \($0)")
-      }
-    } catch {
-      print("Failed to setup overlay")
-    }
   }
 }
