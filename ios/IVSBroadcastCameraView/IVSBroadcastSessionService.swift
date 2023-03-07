@@ -21,8 +21,9 @@ class IVSBroadcastSessionService: NSObject {
   private var broadcastSession: IVSBroadcastSession?
   private var config = IVSBroadcastConfiguration()
   private var cameraSlot: IVSMixerSlotConfiguration!
-  private var slotSources: Dictionary<String, IVSCustomImageSource> = [:]
   private var attachedCamera: IVSDevice?
+  private var overlayConfig: [NSDictionary]?
+  private var slotSources: Dictionary<String, IVSCustomImageSource> = [:]
   
   private var onBroadcastError: RCTDirectEventBlock?
   private var onBroadcastAudioStats: RCTDirectEventBlock?
@@ -225,11 +226,73 @@ class IVSBroadcastSessionService: NSObject {
     
     self.broadcastSession?.attach(microphone, toSlotWithName: cameraSlot.name, onComplete: { (device, error)  in
       if let error = error {
-          print("❌ Error attaching device microphone to session: \(error)")
+        print("❌ Error attaching device microphone to session: \(error)")
       }
-
+      
       self.muteAsync(self.isInitialMuted)
     })
+  }
+  
+  private func updateOverlaySlots() {
+    guard let broadcastSession = self.broadcastSession,
+          let overlayConfig = self.overlayConfig
+    else { return }
+    
+    do {
+      try overlayConfig.forEach { config in
+        guard let name = config["name"] as? String,
+              let uri = config["uri"] as? String
+        else { return }
+        
+        // Create UIImage based on type of uri: http:// or file://
+        var image: UIImage
+        
+        if let imageByFile = UIImage(contentsOfFile: uri) {
+          image = imageByFile
+        } else if uri.starts(with: "http") {
+          guard let url = URL(string: uri),
+                let data = NSData(contentsOf: url),
+                let imageByUrl = UIImage(data: data as Data)
+          else { return }
+          
+          image = imageByUrl
+        } else { return }
+        
+        let size = config["size"] as? NSDictionary
+        let width = size?["width"] as? Int ?? Int(image.size.width)
+        let height = size?["height"] as? Int ?? Int(image.size.height)
+        
+        let position = config["position"] as? NSDictionary
+        let x = position?["x"] as? Int ?? 0
+        let y = position?["y"] as? Int ?? 0
+        
+        let slot = IVSMixerSlotConfiguration()
+        slot.preferredVideoInput = .userImage
+        slot.preferredAudioInput = .unknown
+        slot.aspect = .fit
+        slot.zIndex = 2
+        slot.size = CGSize(width: width, height: height)
+        slot.position = CGPoint(x: x, y: y)
+        try slot.setName(name)
+        
+        broadcastSession.mixer.addSlot(slot)
+        
+        if let source = self.slotSources[slot.name] {
+          broadcastSession.detach(source) {
+            self.slotSources[slot.name] = nil
+          }
+        }
+        
+        let source = broadcastSession.createImageSource(withName: slot.name)
+        broadcastSession.attach(source, toSlotWithName: slot.name) { _ in
+          source.onSampleBuffer(image.cmSampleBuffer)
+          self.slotSources[slot.name] = source
+        }
+      }
+    } catch {
+      print("Failed to update overlay slots")
+      return
+    }
   }
   
   private func preInitiation() throws {
@@ -246,6 +309,7 @@ class IVSBroadcastSessionService: NSObject {
     
     self.attachCamera(urn: BuiltInCameraUrns.backCamera)
     self.attachMicrophone()
+    self.updateOverlaySlots()
   }
   
   public func initiate() throws {
@@ -298,41 +362,6 @@ class IVSBroadcastSessionService: NSObject {
   
   public func stop() {
     self.broadcastSession?.stop()
-  }
-  
-  public func addSlot(_ view: UIView, name: String) throws {
-    guard let broadcastSession = broadcastSession else {
-      return
-    }
-    
-    let slot = IVSMixerSlotConfiguration()
-    slot.preferredVideoInput = .userImage
-    slot.preferredAudioInput = .unknown
-    slot.aspect = .fit
-    slot.zIndex = 2
-    try slot.setName(name)
-    
-    // Since view dimensions are different from config.video dimensions - values needed to be
-    // adjusted before assigning them to slot.
-    slot.size.width = view.frame.width / UIScreen.main.bounds.width * self.config.video.size.width
-    slot.size.height = view.frame.height / UIScreen.main.bounds.height * self.config.video.size.height
-    
-    slot.position.x = view.layer.position.x / UIScreen.main.bounds.width * self.config.video.size.width - view.frame.width / 2
-    slot.position.y = view.layer.position.y / UIScreen.main.bounds.height * self.config.video.size.height - view.frame.height / 2
-    
-    broadcastSession.mixer.addSlot(slot)
-    
-    if let source = self.slotSources[slot.name] {
-      broadcastSession.detach(source) {
-        self.slotSources[slot.name] = nil
-      }
-    }
-    
-    let source = broadcastSession.createImageSource(withName: slot.name)
-    broadcastSession.attach(source, toSlotWithName: slot.name) { _ in
-      source.onSampleBuffer(view.asImage().cmSampleBuffer)
-      self.slotSources[slot.name] = source
-    }
   }
   
   public func getCameraPreviewAsync(_ onReceiveCameraPreview: @escaping onReceiveCameraPreviewHandler) {
@@ -436,6 +465,11 @@ class IVSBroadcastSessionService: NSObject {
   
   public func setAudioConfig(_ audioConfig: NSDictionary?) {
     self.customAudioConfig = audioConfig
+  }
+  
+  public func setOverlayConfig(_ overlayConfig: [NSDictionary]?) {
+    self.overlayConfig = overlayConfig
+    self.updateOverlaySlots()
   }
   
   public func setBroadcastStateChangedHandler(_ onBroadcastStateChangedHandler: RCTDirectEventBlock?) {
@@ -573,17 +607,5 @@ extension UIImage {
                                              sampleBufferOut: &sampleBuffer)
     
     return sampleBuffer!
-  }
-}
-
-extension UIView {
-  func asImage() -> UIImage {
-    let format = UIGraphicsImageRendererFormat()
-    format.scale = 1
-    
-    let renderer = UIGraphicsImageRenderer(bounds: bounds, format: format)
-    return renderer.image { rendererContext in
-      layer.render(in: rendererContext.cgContext)
-    }
   }
 }

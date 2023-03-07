@@ -10,7 +10,6 @@ export type ExtractComponentProps<T> = T extends
 export enum Command {
   Start = 'START',
   Stop = 'STOP',
-  ReloadOverlay = 'RELOAD_OVERLAY',
 }
 
 export enum StateStatusEnum {
@@ -123,6 +122,13 @@ interface IAudioConfig {
   readonly quality?: AudioQuality;
 }
 
+interface IOverlayConfig {
+  readonly name: string;
+  readonly uri: string;
+  readonly size: { width: number; height: number };
+  readonly position: { x: number; y: number };
+}
+
 interface IConnectedStateMetadata {
   readonly sessionId: string;
 }
@@ -181,12 +187,14 @@ interface IBaseProps {
   readonly configurationPreset?: ConfigurationPreset;
   readonly videoConfig?: IVideoConfig;
   readonly audioConfig?: IAudioConfig;
+  readonly overlayConfig?: IOverlayConfig;
   readonly logLevel?: LogLevel;
   readonly sessionLogLevel?: LogLevel;
   readonly cameraPreviewAspectMode?: CameraPreviewAspectMode;
   readonly isCameraPreviewMirrored?: boolean;
   readonly cameraPosition?: CameraPosition;
   readonly isMuted?: boolean;
+  readonly zoom?: number;
 }
 
 export interface IEventHandlers {
@@ -227,5 +235,4 @@ type StartMethodOptions = Pick<IBaseProps, 'rtmpsUrl' | 'streamKey'>;
 export interface IIVSBroadcastCameraView {
   start(options?: StartMethodOptions): void;
   stop(): void;
-  reloadOverlay(): void;
 }

@@ -25,12 +25,5 @@ class IVSBroadcastCameraViewManager: RCTViewManager {
       component.stop()
     }
   }
-  
-  @objc public func RELOAD_OVERLAY(_ node: NSNumber) {
-    DispatchQueue.main.async {
-      let component = self.bridge.uiManager.view(forReactTag: node) as! IVSBroadcastCameraView
-      component.reloadOverlay()
-    }
-  }
 }
 
