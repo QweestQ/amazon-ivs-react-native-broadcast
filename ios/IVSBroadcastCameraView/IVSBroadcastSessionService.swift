@@ -203,7 +203,6 @@ class IVSBroadcastSessionService: NSObject {
   }
   
   private func attachCamera(urn: BuiltInCameraUrns) {
-    IVSBroadcastSession.listAvailableDevices().forEach { print("urn: " + $0.urn) }
     guard let activeCamera = IVSBroadcastSession.listAvailableDevices().first(where: { $0.urn == urn.rawValue }) else { return }
     
     let onComplete: ((IVSDevice?, Error?) -> Void)? = { [weak self] device, error in
@@ -308,11 +307,6 @@ class IVSBroadcastSessionService: NSObject {
   
   private func postInitiation() {
     self.broadcastSession?.logLevel = self.initialSessionLogLevel
-    
-    if (self.isInitialMuted) {
-      self.muteAsync(self.isInitialMuted)
-    }
-    
     self.attachCamera(urn: BuiltInCameraUrns.backCamera)
     self.attachMicrophone()
     self.updateOverlaySlots()

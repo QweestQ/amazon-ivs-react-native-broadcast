@@ -1,14 +1,34 @@
 package com.amazonivsreactnativebroadcast.IVSBroadcastCameraView;
 
+import android.annotation.SuppressLint;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
+import android.graphics.Canvas;
+import android.util.Log;
+import android.view.Surface;
+
 import com.amazonaws.ivs.broadcast.*;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.camera.core.Camera;
+import androidx.camera.core.CameraSelector;
+import androidx.camera.lifecycle.ProcessCameraProvider;
+import androidx.core.content.ContextCompat;
+import androidx.lifecycle.LifecycleOwner;
 
 import com.facebook.react.bridge.Arguments;
+import com.facebook.react.bridge.ReadableArray;
 import com.facebook.react.bridge.ReadableMap;
 import com.facebook.react.bridge.WritableMap;
 import com.facebook.react.uimanager.ThemedReactContext;
+import com.google.common.util.concurrent.ListenableFuture;
+
+import java.io.InputStream;
+import java.net.URL;
+import java.util.HashMap;
+import java.util.Objects;
+import java.util.concurrent.ExecutionException;
 
 @FunctionalInterface
 interface CameraPreviewHandler {
@@ -22,22 +42,23 @@ interface RunnableCallback {
 
 // Guide: https://docs.aws.amazon.com/ivs/latest/userguide//broadcast-android.html
 public class IVSBroadcastSessionService {
-  private ThemedReactContext mReactContext;
+  private final ThemedReactContext mReactContext;
 
   private boolean isInitialMuted = false;
-  private Device.Descriptor.Position initialCameraPosition = Device.Descriptor.Position.BACK;
   private BroadcastConfiguration.LogLevel initialSessionLogLevel = BroadcastConfiguration.LogLevel.ERROR;
   private boolean isCameraPreviewMirrored = false;
   private BroadcastConfiguration.AspectMode cameraPreviewAspectMode = BroadcastConfiguration.AspectMode.NONE;
   private ReadableMap customVideoConfig;
   private ReadableMap customAudioConfig;
 
-  private Device.Descriptor attachedCameraDescriptor;
-  private Device.Descriptor attachedMicrophoneDescriptor;
-
   private String sessionId;
   private BroadcastSession broadcastSession;
   private BroadcastConfiguration config = new BroadcastConfiguration();
+
+  private ReadableArray overlayConfig;
+  private BroadcastConfiguration.Mixer.Slot cameraSlot;
+  private final HashMap<String, SurfaceSource> slotSources = new HashMap<>();
+  private Device attachedCamera;
 
   private RunnableCallback broadcastEventHandler;
   private final BroadcastSession.Listener broadcastSessionListener = new BroadcastSession.Listener() {
@@ -106,21 +127,6 @@ public class IVSBroadcastSessionService {
       broadcastEventHandler.run(Events.ON_TRANSMISSION_STATISTICS_CHANGED, eventPayload);
     }
 
-    @Override
-    public void onBroadcastQualityChanged(double quality) {
-      WritableMap eventPayload = Arguments.createMap();
-      eventPayload.putDouble("quality", quality);
-
-      broadcastEventHandler.run(Events.ON_QUALITY_CHANGED, eventPayload);
-    }
-
-    @Override
-    public void onNetworkHealthChanged(double health) {
-      WritableMap eventPayload = Arguments.createMap();
-      eventPayload.putDouble("networkHealth", health);
-
-      broadcastEventHandler.run(Events.ON_NETWORK_HEALTH_CHANGED, eventPayload);
-    }
   };
 
   private BroadcastConfiguration.LogLevel getLogLevel(String logLevelName) {
@@ -156,20 +162,6 @@ public class IVSBroadcastSessionService {
       }
       default: {
         throw new RuntimeException("Does not support aspect mode: " + aspectModeName);
-      }
-    }
-  }
-
-  private Device.Descriptor.Position getCameraPosition(String cameraPositionName) {
-    switch (cameraPositionName) {
-      case "front": {
-        return Device.Descriptor.Position.FRONT;
-      }
-      case "back": {
-        return Device.Descriptor.Position.BACK;
-      }
-      default: {
-        throw new RuntimeException("Does not support camera position: " + cameraPositionName);
       }
     }
   }
@@ -212,12 +204,6 @@ public class IVSBroadcastSessionService {
     ImagePreviewView preview = broadcastSession.getPreviewView(cameraPreviewAspectMode);
     preview.setMirrored(isCameraPreviewMirrored);
     return preview;
-  }
-
-  private Device.Descriptor[] getInitialDeviceDescriptorList() {
-    return initialCameraPosition == Device.Descriptor.Position.BACK
-      ? Presets.Devices.BACK_CAMERA(mReactContext)
-      : Presets.Devices.FRONT_CAMERA(mReactContext);
   }
 
   private void setCustomVideoConfig() {
@@ -282,31 +268,159 @@ public class IVSBroadcastSessionService {
     }
   }
 
-  private void swapCameraAsync(CameraPreviewHandler callback) {
-    broadcastSession.awaitDeviceChanges(() -> {
-      for (Device.Descriptor deviceDescriptor : broadcastSession.listAvailableDevices(mReactContext)) {
-        if (deviceDescriptor.type == Device.Descriptor.DeviceType.CAMERA && deviceDescriptor.position != attachedCameraDescriptor.position) {
-          broadcastSession.exchangeDevices(attachedCameraDescriptor, deviceDescriptor, newCamera -> {
-            attachedCameraDescriptor = newCamera.getDescriptor();
-            callback.run(getCameraPreview());
-          });
-          break;
-        }
-      }
-    });
-  }
-
   private void muteAsync(boolean isMuted) {
     broadcastSession.awaitDeviceChanges(() -> {
       for (Device device : broadcastSession.listAttachedDevices()) {
+
         Device.Descriptor deviceDescriptor = device.getDescriptor();
-        if (deviceDescriptor.type == Device.Descriptor.DeviceType.MICROPHONE && deviceDescriptor.urn.equals(attachedMicrophoneDescriptor.urn)) {
+
+        if (deviceDescriptor.type == Device.Descriptor.DeviceType.MICROPHONE) {
           Float gain = isMuted ? 0.0F : 1.0F;
           ((AudioDevice) device).setGain(gain);
           break;
         }
       }
     });
+  }
+
+  private void attachCamera() {
+    if (!isInitialized()) {
+      return;
+    }
+
+    for(Device.Descriptor desc: BroadcastSession.listAvailableDevices(mReactContext)) {
+      if(desc.type == Device.Descriptor.DeviceType.CAMERA &&
+        desc.position == Device.Descriptor.Position.BACK) {
+
+        TypedLambda<Device> onComplete = device -> {
+          // Bind the camera device to the camera mixer slot.
+          broadcastSession.getMixer().bind(device, cameraSlot.getName());
+          attachedCamera = device;
+        };
+
+        if (attachedCamera != null) {
+          broadcastSession.exchangeDevices(attachedCamera, desc, onComplete);
+        } else {
+          broadcastSession.attachDevice(desc, onComplete);
+        }
+
+        break;
+      }
+    }
+  }
+
+  private void attachMicrophone() {
+    if (!isInitialized()) {
+      return;
+    }
+
+    for(Device.Descriptor desc: BroadcastSession.listAvailableDevices(mReactContext)) {
+      if(desc.type == Device.Descriptor.DeviceType.MICROPHONE) {
+
+        TypedLambda<Device> onComplete = device -> {
+          // Bind the microphone device to the camera mixer slot.
+          broadcastSession.getMixer().bind(device, cameraSlot.getName());
+          muteAsync(isInitialMuted);
+        };
+
+        broadcastSession.attachDevice(desc, onComplete);
+
+        break;
+      }
+    }
+  }
+
+  private Bitmap getBitmapFromURL(String src) {
+    try {
+      InputStream stream = new URL(src).openStream();
+      return BitmapFactory.decodeStream(stream);
+    } catch (Exception e) {
+      e.printStackTrace();
+      return null;
+    }
+  }
+
+  private void updateOverlaySlots() {
+    if (!isInitialized() || overlayConfig == null) {
+      return;
+    }
+
+    for (int i = 0; i < overlayConfig.size(); i++) {
+      ReadableMap config = overlayConfig.getMap(i);
+
+      // Skip this config map if the name or image uri were not provided
+      if (!config.hasKey("name") || !config.hasKey("uri")) {
+        continue;
+      }
+
+      // Create slot based on config values in a separate thread
+      Thread thread = new Thread(() -> {
+        try {
+          String name = config.getString("name");
+          String uri = config.getString("uri");
+
+          // Get bitmap image from provided uri - http:// or file://
+          Bitmap image = getBitmapFromURL(uri);
+
+          if (image == null) {
+            return;
+          }
+
+          // Assign width and height of the slot based on provided values
+          // or image size if nothing was provided
+          ReadableMap size = config.getMap("size");
+          int width = size == null ? image.getWidth() : (int)size.getDouble("width");
+          int height = size == null ? image.getHeight() : (int)size.getDouble("height");
+
+          // Assign position from provided values or 0
+          ReadableMap position = config.getMap("position");
+          float x = position == null ? 0 : (float)position.getDouble("x");
+          float y = position == null ? 0 : (float)position.getDouble("y");
+
+          // Create and add slot from config values
+          BroadcastConfiguration.Mixer.Slot slot = BroadcastConfiguration.Mixer.Slot.with(it -> {
+            it.setPreferredVideoInput(Device.Descriptor.DeviceType.USER_IMAGE);
+            it.setPreferredAudioInput(Device.Descriptor.DeviceType.UNKNOWN);
+            it.setAspect(BroadcastConfiguration.AspectMode.FIT);
+            it.setzIndex(2);
+            it.setSize(width, height);
+            it.setPosition(new BroadcastConfiguration.Vec2(x, y));
+            it.setName(name);
+
+            return it;
+          });
+          broadcastSession.getMixer().addSlot(slot);
+
+          // Detach and unbind slot with the same name
+          if (slotSources.get(name) != null) {
+            broadcastSession.getMixer().unbind(slotSources.get(name));
+            broadcastSession.detachDevice(Objects.requireNonNull(slotSources.get(name)));
+            slotSources.remove(name);
+          }
+
+          // Create SurfaceSource source with computed size
+          SurfaceSource surfaceSource = broadcastSession.createImageInputSource();
+          surfaceSource.setSize(image.getWidth(), image.getHeight());
+
+          // Get Surface from SurfaceSource and draw bitmap image to it
+          Surface surface = surfaceSource.getInputSurface();
+          Canvas canvas = surface.lockCanvas(null);
+          canvas.drawBitmap(image, 0f, 0f, null);
+          surface.unlockCanvasAndPost(canvas);
+
+          // Bind SurfaceSource to the slot
+          broadcastSession.awaitDeviceChanges(() -> {
+            broadcastSession.getMixer().bind(surfaceSource, slot.getName());
+            slotSources.put(name, surfaceSource);
+          });
+        } catch (Exception e) {
+          Log.e("updateOverlaySlots", e.toString());
+          e.printStackTrace();
+        }
+      });
+
+      thread.start();
+    }
   }
 
   private void preInitialization() {
@@ -316,19 +430,9 @@ public class IVSBroadcastSessionService {
 
   private void postInitialization() {
     broadcastSession.setLogLevel(initialSessionLogLevel);
-    if (isInitialMuted) {
-      muteAsync(true);
-    }
-  }
-
-  private void saveInitialDevicesDescriptor(@NonNull Device.Descriptor[] deviceDescriptors) {
-    for (Device.Descriptor deviceDescriptor : deviceDescriptors) {
-      if (deviceDescriptor.type == Device.Descriptor.DeviceType.CAMERA) {
-        attachedCameraDescriptor = deviceDescriptor;
-      } else if (deviceDescriptor.type == Device.Descriptor.DeviceType.MICROPHONE) {
-        attachedMicrophoneDescriptor = deviceDescriptor;
-      }
-    }
+    attachCamera();
+    attachMicrophone();
+    updateOverlaySlots();
   }
 
   public enum Events {
@@ -363,14 +467,24 @@ public class IVSBroadcastSessionService {
     } else {
       preInitialization();
 
+      cameraSlot = BroadcastConfiguration.Mixer.Slot.with(it -> {
+        it.setzIndex(1);
+        it.setPreferredVideoInput(Device.Descriptor.DeviceType.CAMERA);
+        it.setPreferredAudioInput(Device.Descriptor.DeviceType.MICROPHONE);
+        it.setName("camera");
+
+        return it;
+      });
+
+      config.mixer.slots = new BroadcastConfiguration.Mixer.Slot[] { cameraSlot };
+      config.video.enableTransparency(true);
+
       broadcastSession = new BroadcastSession(
         mReactContext,
         broadcastSessionListener,
         config,
-        getInitialDeviceDescriptorList()
+        null
       );
-
-      saveInitialDevicesDescriptor(getInitialDeviceDescriptorList());
 
       postInitialization();
     }
@@ -400,23 +514,10 @@ public class IVSBroadcastSessionService {
     broadcastSession.stop();
   }
 
-  @Deprecated
-  public void swapCamera(CameraPreviewHandler callback) {
-    swapCameraAsync(callback);
-  }
-
   public void getCameraPreviewAsync(CameraPreviewHandler callback) {
     broadcastSession.awaitDeviceChanges(() -> {
       callback.run(getCameraPreview());
     });
-  }
-
-  public void setCameraPosition(String cameraPositionName, CameraPreviewHandler callback) {
-    if (isInitialized()) {
-      swapCameraAsync(callback);
-    } else {
-      initialCameraPosition = getCameraPosition(cameraPositionName);
-    }
   }
 
   public void setCameraPreviewAspectMode(String cameraPreviewAspectModeName, CameraPreviewHandler callback) {
@@ -439,6 +540,27 @@ public class IVSBroadcastSessionService {
     } else {
       isInitialMuted = isMuted;
     }
+  }
+
+  @SuppressLint("MissingPermission")
+  public void setZoom(float zoom) {
+    if (!isInitialized()) {
+      return;
+    }
+
+    ListenableFuture<ProcessCameraProvider> cameraProviderFuture = ProcessCameraProvider.getInstance(mReactContext);
+    cameraProviderFuture.addListener(() -> {
+      try {
+        ProcessCameraProvider cameraProvider = cameraProviderFuture.get();
+        if (cameraProvider != null) {
+          Camera camera = cameraProvider.bindToLifecycle((LifecycleOwner)mReactContext.getCurrentActivity(), CameraSelector.DEFAULT_BACK_CAMERA);
+          camera.getCameraControl().setLinearZoom(zoom);
+        }
+      } catch (ExecutionException | InterruptedException e) {
+        Log.d("Zoom error:", e.toString());
+        e.printStackTrace();
+      }
+    }, ContextCompat.getMainExecutor(mReactContext));
   }
 
   public void setSessionLogLevel(String sessionLogLevelName) {
@@ -467,6 +589,11 @@ public class IVSBroadcastSessionService {
 
   public void setAudioConfig(ReadableMap audioConfig) {
     customAudioConfig = audioConfig;
+  }
+
+  public void setOverlayConfig(ReadableArray overlayConfig) {
+    this.overlayConfig = overlayConfig;
+    updateOverlaySlots();
   }
 
   public void setEventHandler(RunnableCallback handler) {

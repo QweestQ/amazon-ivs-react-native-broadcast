@@ -32,8 +32,7 @@ public class IVSBroadcastCameraViewManger extends ViewGroupManager<IVSBroadcastC
   @Override
   public Map<String, Integer> getCommandsMap() {
     return MapBuilder.of(IVSBroadcastCameraView.START_COMMAND_NAME, 0,
-      IVSBroadcastCameraView.STOP_COMMAND_NAME, 1,
-      IVSBroadcastCameraView.SWAP_CAMERA_COMMAND_NAME, 2);
+      IVSBroadcastCameraView.STOP_COMMAND_NAME, 1);
   }
 
   @Override
@@ -45,10 +44,6 @@ public class IVSBroadcastCameraViewManger extends ViewGroupManager<IVSBroadcastC
       }
       case IVSBroadcastCameraView.STOP_COMMAND_NAME: {
         view.stop();
-        break;
-      }
-      case IVSBroadcastCameraView.SWAP_CAMERA_COMMAND_NAME: {
-        view.swapCamera();
         break;
       }
       default: {
@@ -73,14 +68,14 @@ public class IVSBroadcastCameraViewManger extends ViewGroupManager<IVSBroadcastC
     view.setIsMuted(isMuted);
   }
 
+  @ReactProp(name = "zoom")
+  public void setZoom(@NonNull IVSBroadcastCameraView view, float zoom) {
+    view.setZoom(zoom);
+  }
+
   @ReactProp(name = "isCameraPreviewMirrored")
   public void setIsCameraPreviewMirrored(@NonNull IVSBroadcastCameraView view, boolean isCameraPreviewMirrored) {
     view.setIsCameraPreviewMirrored(isCameraPreviewMirrored);
-  }
-
-  @ReactProp(name = "cameraPosition")
-  public void setCameraPosition(@NonNull IVSBroadcastCameraView view, String cameraPosition) {
-    view.setCameraPosition(cameraPosition);
   }
 
   @ReactProp(name = "cameraPreviewAspectMode")
@@ -121,5 +116,10 @@ public class IVSBroadcastCameraViewManger extends ViewGroupManager<IVSBroadcastC
   @ReactProp(name = "audioConfig")
   public void setAudioConfig(@NonNull IVSBroadcastCameraView view, ReadableMap audioConfig) {
     view.setAudioConfig(audioConfig);
+  }
+
+  @ReactProp(name = "overlayConfig")
+  public void setOverlayConfig(@NonNull IVSBroadcastCameraView view, ReadableArray overlayConfig) {
+    view.setOverlayConfig(overlayConfig);
   }
 }
