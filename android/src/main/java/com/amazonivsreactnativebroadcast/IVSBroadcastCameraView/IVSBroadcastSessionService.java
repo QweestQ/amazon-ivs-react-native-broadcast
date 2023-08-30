@@ -354,72 +354,68 @@ public class IVSBroadcastSessionService {
       }
 
       // Create slot based on config values in a separate thread
-      Thread thread = new Thread(() -> {
-        try {
-          String name = config.getString("name");
-          String uri = config.getString("uri");
+      try {
+        String name = config.getString("name");
+        String uri = config.getString("uri");
 
-          // Get bitmap image from provided uri - http:// or file://
-          Bitmap image = getBitmapFromURL(uri);
+        // Get bitmap image from provided uri - http:// or file://
+        Bitmap image = getBitmapFromURL(uri);
 
-          if (image == null) {
-            return;
-          }
-
-          // Assign width and height of the slot based on provided values
-          // or image size if nothing was provided
-          ReadableMap size = config.getMap("size");
-          int width = size == null ? image.getWidth() : (int)size.getDouble("width");
-          int height = size == null ? image.getHeight() : (int)size.getDouble("height");
-
-          // Assign position from provided values or 0
-          ReadableMap position = config.getMap("position");
-          float x = position == null ? 0 : (float)position.getDouble("x");
-          float y = position == null ? 0 : (float)position.getDouble("y");
-
-          // Create and add slot from config values
-          BroadcastConfiguration.Mixer.Slot slot = BroadcastConfiguration.Mixer.Slot.with(it -> {
-            it.setPreferredVideoInput(Device.Descriptor.DeviceType.USER_IMAGE);
-            it.setPreferredAudioInput(Device.Descriptor.DeviceType.UNKNOWN);
-            it.setAspect(BroadcastConfiguration.AspectMode.FIT);
-            it.setzIndex(2);
-            it.setSize(width, height);
-            it.setPosition(new BroadcastConfiguration.Vec2(x, y));
-            it.setName(name);
-
-            return it;
-          });
-          broadcastSession.getMixer().addSlot(slot);
-
-          // Detach and unbind slot with the same name
-          if (slotSources.get(name) != null) {
-            broadcastSession.getMixer().unbind(slotSources.get(name));
-            broadcastSession.detachDevice(Objects.requireNonNull(slotSources.get(name)));
-            slotSources.remove(name);
-          }
-
-          // Create SurfaceSource source with computed size
-          SurfaceSource surfaceSource = broadcastSession.createImageInputSource();
-          surfaceSource.setSize(image.getWidth(), image.getHeight());
-
-          // Get Surface from SurfaceSource and draw bitmap image to it
-          Surface surface = surfaceSource.getInputSurface();
-          Canvas canvas = surface.lockCanvas(null);
-          canvas.drawBitmap(image, 0f, 0f, null);
-          surface.unlockCanvasAndPost(canvas);
-
-          // Bind SurfaceSource to the slot
-          broadcastSession.awaitDeviceChanges(() -> {
-            broadcastSession.getMixer().bind(surfaceSource, slot.getName());
-            slotSources.put(name, surfaceSource);
-          });
-        } catch (Exception e) {
-          Log.e("updateOverlaySlots", e.toString());
-          e.printStackTrace();
+        if (image == null) {
+          return;
         }
-      });
 
-      thread.start();
+        // Assign width and height of the slot based on provided values
+        // or image size if nothing was provided
+        ReadableMap size = config.getMap("size");
+        int width = size == null ? image.getWidth() : (int)size.getDouble("width");
+        int height = size == null ? image.getHeight() : (int)size.getDouble("height");
+
+        // Assign position from provided values or 0
+        ReadableMap position = config.getMap("position");
+        float x = position == null ? 0 : (float)position.getDouble("x");
+        float y = position == null ? 0 : (float)position.getDouble("y");
+
+        // Create and add slot from config values
+        BroadcastConfiguration.Mixer.Slot slot = BroadcastConfiguration.Mixer.Slot.with(it -> {
+          it.setPreferredVideoInput(Device.Descriptor.DeviceType.USER_IMAGE);
+          it.setPreferredAudioInput(Device.Descriptor.DeviceType.UNKNOWN);
+          it.setAspect(BroadcastConfiguration.AspectMode.FIT);
+          it.setzIndex(2);
+          it.setSize(width, height);
+          it.setPosition(new BroadcastConfiguration.Vec2(x, y));
+          it.setName(name);
+
+          return it;
+        });
+        broadcastSession.getMixer().addSlot(slot);
+
+        // Detach and unbind slot with the same name
+        if (slotSources.get(name) != null) {
+          broadcastSession.getMixer().unbind(slotSources.get(name));
+          broadcastSession.detachDevice(Objects.requireNonNull(slotSources.get(name)));
+          slotSources.remove(name);
+        }
+
+        // Create SurfaceSource source with computed size
+        SurfaceSource surfaceSource = broadcastSession.createImageInputSource();
+        surfaceSource.setSize(image.getWidth(), image.getHeight());
+
+        // Get Surface from SurfaceSource and draw bitmap image to it
+        Surface surface = surfaceSource.getInputSurface();
+        Canvas canvas = surface.lockCanvas(null);
+        canvas.drawBitmap(image, 0f, 0f, null);
+        surface.unlockCanvasAndPost(canvas);
+
+        // Bind SurfaceSource to the slot
+        broadcastSession.awaitDeviceChanges(() -> {
+          broadcastSession.getMixer().bind(surfaceSource, slot.getName());
+          slotSources.put(name, surfaceSource);
+        });
+      } catch (Exception e) {
+        Log.e("updateOverlaySlots", e.toString());
+        e.printStackTrace();
+      }
     }
   }
 
