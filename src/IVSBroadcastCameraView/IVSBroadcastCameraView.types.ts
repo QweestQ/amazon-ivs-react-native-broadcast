@@ -122,7 +122,7 @@ interface IAudioConfig {
   readonly quality?: AudioQuality;
 }
 
-interface IOverlayConfig {
+export interface IOverlayConfig {
   readonly name: string;
   readonly uri: string;
   readonly size: { width: number; height: number };
