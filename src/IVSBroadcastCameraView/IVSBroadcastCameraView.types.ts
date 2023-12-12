@@ -60,7 +60,7 @@ type AudioSessionStrategy =
   | 'playAndRecordDefaultToSpeaker'
   | 'noAction';
 
-type ConfigurationPreset =
+export type ConfigurationPreset =
   | 'standardPortrait'
   | 'standardLandscape'
   | 'basicPortrait'
