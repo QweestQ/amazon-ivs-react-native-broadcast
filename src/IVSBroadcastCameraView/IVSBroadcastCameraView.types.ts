@@ -187,7 +187,7 @@ interface IBaseProps {
   readonly configurationPreset?: ConfigurationPreset;
   readonly videoConfig?: IVideoConfig;
   readonly audioConfig?: IAudioConfig;
-  readonly overlayConfig?: IOverlayConfig;
+  readonly overlayConfig?: IOverlayConfig[];
   readonly logLevel?: LogLevel;
   readonly sessionLogLevel?: LogLevel;
   readonly cameraPreviewAspectMode?: CameraPreviewAspectMode;
