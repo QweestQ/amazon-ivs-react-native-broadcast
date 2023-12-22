@@ -294,8 +294,10 @@ public class IVSBroadcastSessionService {
 
         TypedLambda<Device> onComplete = device -> {
           // Bind the camera device to the camera mixer slot.
-          broadcastSession.getMixer().bind(device, cameraSlot.getName());
-          attachedCamera = device;
+          if (broadcastSession != null) {
+            broadcastSession.getMixer().bind(device, cameraSlot.getName());
+            attachedCamera = device;
+          }
         };
 
         if (attachedCamera != null) {
@@ -319,8 +321,10 @@ public class IVSBroadcastSessionService {
 
         TypedLambda<Device> onComplete = device -> {
           // Bind the microphone device to the camera mixer slot.
-          broadcastSession.getMixer().bind(device, cameraSlot.getName());
-          muteAsync(isInitialMuted);
+          if (broadcastSession != null) {
+            broadcastSession.getMixer().bind(device, cameraSlot.getName());
+            muteAsync(isInitialMuted);
+          }
         };
 
         broadcastSession.attachDevice(desc, onComplete);
