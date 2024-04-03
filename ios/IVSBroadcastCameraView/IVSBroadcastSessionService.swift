@@ -233,12 +233,35 @@ class IVSBroadcastSessionService: NSObject {
     })
   }
 
+  private func removeExistingOverlaySlot(name: String) {
+    guard let broadcastSession = self.broadcastSession,
+          let source = self.slotSources[name]
+    else { return }
+
+    // Detach previous source from session & remove slot if it already existed
+    broadcastSession.detach(source) {
+      self.slotSources[name] = nil
+    }
+    broadcastSession.mixer.removeSlot(withName: name)
+  }
+
   private func updateOverlaySlots() {
     guard let broadcastSession = self.broadcastSession,
           let overlayConfig = self.overlayConfig
     else { return }
 
     do {
+      if self.slotSources.keys.count > overlayConfig.count {
+        self.slotSources.keys.forEach { sourceName in
+          let containsSource = overlayConfig.contains { config in
+            (config["name"] as? String) == sourceName
+          }
+          if !containsSource {
+            removeExistingOverlaySlot(name: sourceName)
+          }
+        }
+      }
+
       try overlayConfig.forEach { config in
         guard let name = config["name"] as? String,
               let uri = config["uri"] as? String
@@ -279,14 +302,8 @@ class IVSBroadcastSessionService: NSObject {
         slot.position = CGPoint(x: x, y: y)
         try slot.setName(name)
 
+        removeExistingOverlaySlot(name: slot.name)
         broadcastSession.mixer.addSlot(slot)
-
-        // Detach previous source from session if it was already existed
-        if let source = self.slotSources[slot.name] {
-          broadcastSession.detach(source) {
-            self.slotSources[slot.name] = nil
-          }
-        }
 
         // Create image source and attach it to the mixer slot of the session
         let source = broadcastSession.createImageSource(withName: slot.name)
