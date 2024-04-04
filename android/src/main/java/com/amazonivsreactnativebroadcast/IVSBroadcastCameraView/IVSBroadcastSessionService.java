@@ -344,9 +344,42 @@ public class IVSBroadcastSessionService {
     }
   }
 
+  private void removeExistingOverlaySlot(String name) {
+    Device slotSource = slotSources.get(name);
+    if (slotSource == null) {
+      return;
+    }
+
+    // Detach previous source from session & remove slot if it already existed
+    broadcastSession.getMixer().unbind(slotSource);
+    broadcastSession.detachDevice(slotSource);
+    slotSources.remove(name);
+    broadcastSession.getMixer().removeSlot(name);
+  }
+
   private void updateOverlaySlots() {
     if (!isInitialized() || overlayConfig == null) {
       return;
+    }
+
+    if (slotSources.size() > overlayConfig.size()) {
+      for (String sourceName : slotSources.keySet()) {
+        boolean containsSource = false;
+        for (int i = 0; i < overlayConfig.size(); i++) {
+          ReadableMap config = overlayConfig.getMap(i);
+          if (sourceName.equals(config.getString("name"))) {
+            containsSource = true;
+            break;
+          }
+        }
+
+        if (!containsSource) {
+          removeExistingOverlaySlot(sourceName);
+          if (slotSources.size() == overlayConfig.size()) {
+            break;
+          }
+        }
+      }
     }
 
     for (int i = 0; i < overlayConfig.size(); i++) {
@@ -380,6 +413,8 @@ public class IVSBroadcastSessionService {
         float x = position == null ? 0 : (float)position.getDouble("x");
         float y = position == null ? 0 : (float)position.getDouble("y");
 
+        removeExistingOverlaySlot(name);
+
         // Create and add slot from config values
         BroadcastConfiguration.Mixer.Slot slot = BroadcastConfiguration.Mixer.Slot.with(it -> {
           it.setPreferredVideoInput(Device.Descriptor.DeviceType.USER_IMAGE);
@@ -393,13 +428,6 @@ public class IVSBroadcastSessionService {
           return it;
         });
         broadcastSession.getMixer().addSlot(slot);
-
-        // Detach and unbind slot with the same name
-        if (slotSources.get(name) != null) {
-          broadcastSession.getMixer().unbind(slotSources.get(name));
-          broadcastSession.detachDevice(Objects.requireNonNull(slotSources.get(name)));
-          slotSources.remove(name);
-        }
 
         // Create SurfaceSource source with computed size
         SurfaceSource surfaceSource = broadcastSession.createImageInputSource();
