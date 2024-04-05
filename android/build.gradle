@@ -57,7 +57,7 @@ repositories {
 
 dependencies {
   implementation "com.facebook.react:react-native:+"  // From node_modules
-  implementation "com.amazonaws:ivs-broadcast:$ivsBroadcastSdkVersion"
+  implementation "com.amazonaws:ivs-broadcast:1.16.0"
 
 
   // CameraX core library using the camera2 implementation

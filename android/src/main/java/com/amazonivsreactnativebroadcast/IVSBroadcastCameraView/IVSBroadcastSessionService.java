@@ -344,17 +344,16 @@ public class IVSBroadcastSessionService {
     }
   }
 
-  private void removeExistingOverlaySlot(String name) {
+  private void removeOverlaySlot(String name) {
     Device slotSource = slotSources.get(name);
     if (slotSource == null) {
       return;
     }
 
-    // Detach previous source from session & remove slot if it already existed
     broadcastSession.getMixer().unbind(slotSource);
     broadcastSession.detachDevice(slotSource);
-    slotSources.remove(name);
     broadcastSession.getMixer().removeSlot(name);
+    slotSources.remove(name);
   }
 
   private void updateOverlaySlots() {
@@ -362,24 +361,8 @@ public class IVSBroadcastSessionService {
       return;
     }
 
-    if (slotSources.size() > overlayConfig.size()) {
-      for (String sourceName : slotSources.keySet()) {
-        boolean containsSource = false;
-        for (int i = 0; i < overlayConfig.size(); i++) {
-          ReadableMap config = overlayConfig.getMap(i);
-          if (sourceName.equals(config.getString("name"))) {
-            containsSource = true;
-            break;
-          }
-        }
-
-        if (!containsSource) {
-          removeExistingOverlaySlot(sourceName);
-          if (slotSources.size() == overlayConfig.size()) {
-            break;
-          }
-        }
-      }
+    for (String sourceName : slotSources.keySet()) {
+      removeOverlaySlot(sourceName);
     }
 
     for (int i = 0; i < overlayConfig.size(); i++) {
@@ -412,8 +395,6 @@ public class IVSBroadcastSessionService {
         ReadableMap position = config.getMap("position");
         float x = position == null ? 0 : (float)position.getDouble("x");
         float y = position == null ? 0 : (float)position.getDouble("y");
-
-        removeExistingOverlaySlot(name);
 
         // Create and add slot from config values
         BroadcastConfiguration.Mixer.Slot slot = BroadcastConfiguration.Mixer.Slot.with(it -> {
@@ -570,25 +551,27 @@ public class IVSBroadcastSessionService {
     }
   }
 
-  @SuppressLint("MissingPermission")
   public void setZoom(float zoom) {
-    if (!isInitialized()) {
+    if (!isInitialized() || zoom < 1) {
       return;
     }
 
-    ListenableFuture<ProcessCameraProvider> cameraProviderFuture = ProcessCameraProvider.getInstance(mReactContext);
-    cameraProviderFuture.addListener(() -> {
-      try {
-        ProcessCameraProvider cameraProvider = cameraProviderFuture.get();
-        if (cameraProvider != null) {
-          Camera camera = cameraProvider.bindToLifecycle((LifecycleOwner)mReactContext.getCurrentActivity(), CameraSelector.DEFAULT_BACK_CAMERA);
-          camera.getCameraControl().setLinearZoom(zoom);
-        }
-      } catch (ExecutionException | InterruptedException e) {
-        Log.d("Zoom error:", e.toString());
-        e.printStackTrace();
-      }
-    }, ContextCompat.getMainExecutor(mReactContext));
+    CameraSource cameraSource = (CameraSource) attachedCamera;
+
+    if (cameraSource == null) {
+      return;
+    }
+
+    CameraSource.Capabilities capabilities = cameraSource.getCapabilities();
+    if (!capabilities.isZoomSupported()) {
+      return;
+    }
+
+    CameraSource.Options options = new CameraSource.Options.Builder()
+      .setZoomFactor(zoom)
+      .build();
+
+    cameraSource.setOptions(options);
   }
 
   public void setSessionLogLevel(String sessionLogLevelName) {
