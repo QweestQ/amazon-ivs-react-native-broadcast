@@ -353,7 +353,6 @@ public class IVSBroadcastSessionService {
     broadcastSession.getMixer().unbind(slotSource);
     broadcastSession.detachDevice(slotSource);
     broadcastSession.getMixer().removeSlot(name);
-    slotSources.remove(name);
   }
 
   private void updateOverlaySlots() {
@@ -364,6 +363,7 @@ public class IVSBroadcastSessionService {
     for (String sourceName : slotSources.keySet()) {
       removeOverlaySlot(sourceName);
     }
+    slotSources.clear();
 
     for (int i = 0; i < overlayConfig.size(); i++) {
       ReadableMap config = overlayConfig.getMap(i);
