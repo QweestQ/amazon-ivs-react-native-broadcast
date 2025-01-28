@@ -461,11 +461,18 @@ class IVSBroadcastSessionService: NSObject {
 
     do {
       try camera?.lockForConfiguration()
-    } catch {
-      return
-    }
 
-    camera?.ramp(toVideoZoomFactor: zoom, withRate: 5)
+      camera?.ramp(toVideoZoomFactor: zoom, withRate: 5)
+
+      //Configure autofocus if supported or set the focus point to center
+      if camera?.isFocusModeSupported(.continuousAutoFocus) == true {
+        camera?.focusMode = .continuousAutoFocus
+      } else if camera?.isFocusPointOfInterestSupported == true {
+        camera?.focusPointOfInterest = CGPoint(x: 0.5, y: 0.5)
+      }
+    } catch {
+      print("❌ Error configuring camera zoom: \(error)")
+    }
   }
 
   public func setSessionLogLevel(_ logLevel: NSString?) {
