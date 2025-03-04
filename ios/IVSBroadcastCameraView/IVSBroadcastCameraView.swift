@@ -3,7 +3,7 @@ import AVFoundation
 
 class IVSBroadcastCameraView: UIView {
   private let broadcastSession: IVSBroadcastSessionService = IVSBroadcastSessionService()
-  
+
   @objc var streamKey: NSString?
   @objc var rtmpsUrl: NSString?
   @objc var isMuted: Bool = false {
@@ -56,7 +56,7 @@ class IVSBroadcastCameraView: UIView {
       self.broadcastSession.setOverlayConfig(overlayConfig)
     }
   }
-  
+
   @objc var onIsBroadcastReady: RCTDirectEventBlock?
   @objc var onAudioSessionInterrupted: RCTDirectEventBlock?
   @objc var onAudioSessionResumed: RCTDirectEventBlock?
@@ -95,14 +95,14 @@ class IVSBroadcastCameraView: UIView {
       self.broadcastSession.setTransmissionStatisticsChangedHandler(onTransmissionStatisticsChanged)
     }
   }
-  
+
   @objc
   private func audioSessionInterrupted(_ notification: Notification) {
     guard let userInfo = notification.userInfo,
           let typeValue = userInfo[AVAudioSessionInterruptionTypeKey] as? UInt,
           let type = AVAudioSession.InterruptionType(rawValue: typeValue)
     else { return }
-    
+
     switch type {
     case .began:
       self.onAudioSessionInterrupted?([:])
@@ -112,17 +112,17 @@ class IVSBroadcastCameraView: UIView {
       break
     }
   }
-  
+
   @objc
   private func mediaServicesWereLost(_ notification: Notification) {
     self.onMediaServicesWereLost?([:])
   }
-  
+
   @objc
   private func mediaServicesWereReset(_ notification: Notification) {
     self.onMediaServicesWereReset?([:])
   }
-  
+
   // Observing notifications sent through NSNotificationCenter (Audio Interruptions & Media Services Lost sections)
   private func subscribeToNotificationCenter() {
     let center = NotificationCenter.default
@@ -142,18 +142,18 @@ class IVSBroadcastCameraView: UIView {
       name: AVAudioSession.mediaServicesWereResetNotification,
       object: nil)
   }
-  
+
   private func unsubscribeNotificationCenter() {
     let center = NotificationCenter.default
     center.removeObserver(self, name: AVAudioSession.interruptionNotification, object: nil)
     center.removeObserver(self, name: AVAudioSession.mediaServicesWereLostNotification, object: nil)
     center.removeObserver(self, name: AVAudioSession.mediaServicesWereResetNotification, object: nil)
   }
-  
+
   private func onErrorHandler(_ error: Error) {
     self.onError?(["message": error.localizedDescription])
   }
-  
+
   private func onReceiveCameraPreviewHandler(_ preview: UIView) {
     self.subviews.forEach { $0.removeFromSuperview() }
     preview.translatesAutoresizingMaskIntoConstraints = false
@@ -165,22 +165,22 @@ class IVSBroadcastCameraView: UIView {
       preview.trailingAnchor.constraint(equalTo: self.trailingAnchor, constant: 0),
     ])
   }
-  
+
   override init(frame: CGRect) {
     super.init(frame: frame)
   }
-  
+
   required init?(coder aDecoder: NSCoder) {
     fatalError("init(coder:) has not been implemented.")
   }
-  
+
   deinit {
     UIApplication.shared.isIdleTimerDisabled = false
     self.unsubscribeNotificationCenter()
     self.subviews.forEach { $0.removeFromSuperview() }
     self.broadcastSession.deinitiate()
   }
-  
+
   override func didMoveToSuperview() {
     if (self.superview != nil && !self.broadcastSession.isInitialized()) {
       do {
@@ -197,28 +197,39 @@ class IVSBroadcastCameraView: UIView {
       }
     }
   }
-  
+
   public func start(_ options: NSDictionary) {
     let rtmpsUrl = options["rtmpsUrl"] != nil ? options["rtmpsUrl"] : self.rtmpsUrl
     let streamKey = options["streamKey"] != nil ? options["streamKey"] : self.streamKey
-    
+
     guard let finalRtmpsUrl = rtmpsUrl else {
       assertionFailure("'rtmpsUrl' is empty.")
       return
     }
-    
+
     guard let finalStreamKey = streamKey else {
       assertionFailure("'streamKey' is empty.")
       return
     }
-    
+
     do {
       try self.broadcastSession.start(ivsRTMPSUrl: finalRtmpsUrl as! NSString, ivsStreamKey: finalStreamKey as! NSString)
     } catch {
       self.onErrorHandler(error)
     }
   }
-  
+
+  public func focus(_ point: NSDictionary) {
+    guard let x = point["x"] as? CGFloat,
+          let y = point["y"] as? CGFloat else {
+      print("Invalid focus point dimensions. Expected { x: number, y: number }")
+      return
+    }
+
+    let focusPoint = CGPoint(x: x, y: y)
+    self.broadcastSession.focus(focusPoint)
+  }
+
   public func stop() {
     self.broadcastSession.stop()
   }

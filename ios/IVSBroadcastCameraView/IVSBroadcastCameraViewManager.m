@@ -34,5 +34,6 @@ RCT_EXPORT_VIEW_PROPERTY(onTransmissionStatisticsChanged, RCTDirectEventBlock)
 
 // Methods
 RCT_EXTERN_METHOD(START:(nonnull NSNumber *)node options:(NSDictionary)options)
+RCT_EXTERN_METHOD(FOCUS:(nonnull NSNumber *)node point:(NSDictionary)point)
 RCT_EXTERN_METHOD(STOP:(nonnull NSNumber *)node)
 @end

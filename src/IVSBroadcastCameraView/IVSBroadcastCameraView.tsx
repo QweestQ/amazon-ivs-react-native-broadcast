@@ -91,6 +91,10 @@ const IVSBroadcastCameraView = forwardRef<
         start: (
           options: Parameters<IIVSBroadcastCameraView['start']>[number] = {}
         ) => dispatchViewManagerCommand(Command.Start, options),
+        focus: (...options: Parameters<IIVSBroadcastCameraView['focus']>) => {
+          const [point] = options;
+          dispatchViewManagerCommand(Command.Focus, point);
+        },
         stop: () => dispatchViewManagerCommand(Command.Stop),
       };
     },
