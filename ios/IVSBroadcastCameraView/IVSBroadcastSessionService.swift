@@ -475,6 +475,42 @@ class IVSBroadcastSessionService: NSObject {
     }
   }
 
+  public func focus(_ point: CGPoint) {
+    let deviceId = self.attachedCamera?.descriptor().deviceId
+    let availableDevices = AVCaptureDevice.DiscoverySession(
+      deviceTypes: [.builtInWideAngleCamera, .builtInTelephotoCamera, .builtInUltraWideCamera],
+      mediaType: .video,
+      position: .back
+    ).devices
+
+    // Find the active camera by matching its device ID
+    let camera = availableDevices.first(where: { $0.uniqueID == deviceId })
+
+    do {
+      try camera?.lockForConfiguration()
+
+      // Convert the touch point from screen coordinates to normalized camera coordinates
+      let cameraPoint = CGPoint(
+        x: point.x / UIScreen.main.bounds.width,
+        y: point.y / UIScreen.main.bounds.height
+      )
+
+      // Set new focus point if the camera supports focus adjustments
+      if camera?.isFocusPointOfInterestSupported == true {
+        camera?.focusPointOfInterest = cameraPoint
+        camera?.focusMode = .autoFocus
+      }
+
+      // Set new exposure point if the camera supports exposure adjustments
+      if camera?.isExposurePointOfInterestSupported == true {
+        camera?.exposurePointOfInterest = cameraPoint
+        camera?.exposureMode = .continuousAutoExposure
+      }
+    } catch {
+      print("❌ Error setting focus/exposure: \(error)")
+    }
+  }
+
   public func setSessionLogLevel(_ logLevel: NSString?) {
     if let logLevelName = logLevel {
       let sessionLogLevel = self.getLogLevel(logLevelName)

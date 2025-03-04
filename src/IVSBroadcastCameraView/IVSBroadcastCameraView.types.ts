@@ -9,6 +9,7 @@ export type ExtractComponentProps<T> = T extends
 
 export enum Command {
   Start = 'START',
+  Focus = 'FOCUS',
   Stop = 'STOP',
 }
 
@@ -65,6 +66,8 @@ export type ConfigurationPreset =
   | 'standardLandscape'
   | 'basicPortrait'
   | 'basicLandscape';
+
+export type FocusPointDimensions = { x: number; y: number };
 
 type AutomaticBitrateProfile = 'conservative' | 'fastIncrease';
 
@@ -234,5 +237,6 @@ type StartMethodOptions = Pick<IBaseProps, 'rtmpsUrl' | 'streamKey'>;
 
 export interface IIVSBroadcastCameraView {
   start(options?: StartMethodOptions): void;
+  focus(options?: FocusPointDimensions): void;
   stop(): void;
 }
