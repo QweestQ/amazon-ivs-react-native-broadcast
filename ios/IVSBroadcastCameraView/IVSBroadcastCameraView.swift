@@ -214,6 +214,10 @@ class IVSBroadcastCameraView: UIView {
 
     do {
       try self.broadcastSession.start(ivsRTMPSUrl: finalRtmpsUrl as! NSString, ivsStreamKey: finalStreamKey as! NSString)
+
+      if (self.zoom != 1.0) {
+        self.broadcastSession.setZoom(CGFloat(truncating: self.zoom))
+      }
     } catch {
       self.onErrorHandler(error)
     }
