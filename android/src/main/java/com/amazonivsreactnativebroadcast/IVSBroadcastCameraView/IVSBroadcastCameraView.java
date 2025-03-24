@@ -40,6 +40,7 @@ public class IVSBroadcastCameraView extends FrameLayout implements LifecycleEven
 
   private String STREAM_KEY;
   private String RTMPS_URL;
+  private Float ZOOM = 1.0F;
   private IVSBroadcastSessionService ivsBroadcastSession;
 
   /**
@@ -152,6 +153,10 @@ public class IVSBroadcastCameraView extends FrameLayout implements LifecycleEven
 
     try {
       ivsBroadcastSession.start(finalRtmpsUrl, finalStreamKey);
+
+      if (ZOOM != 1.0F) {
+        ivsBroadcastSession.setZoom(ZOOM);
+      }
     } catch (RuntimeException error) {
       sendErrorEvent(error.toString());
     }
@@ -176,6 +181,7 @@ public class IVSBroadcastCameraView extends FrameLayout implements LifecycleEven
 
   protected void setZoom(float zoom) {
     ivsBroadcastSession.setZoom(zoom);
+    ZOOM = zoom;
   }
 
   protected void setIsCameraPreviewMirrored(boolean isCameraPreviewMirrored) {
