@@ -107,7 +107,13 @@ class IVSBroadcastCameraView: UIView {
     case .began:
       self.onAudioSessionInterrupted?([:])
     case .ended:
-      self.onAudioSessionResumed?([:])
+      if let optionsValue = userInfo[AVAudioSessionInterruptionOptionKey] as? UInt {
+          let options = AVAudioSession.InterruptionOptions(rawValue: optionsValue)
+          if options.contains(.shouldResume) {
+            try? AVAudioSession.sharedInstance().setActive(true, options: [])
+            self.onAudioSessionResumed?([:])
+          }
+      }
     @unknown default:
       break
     }
