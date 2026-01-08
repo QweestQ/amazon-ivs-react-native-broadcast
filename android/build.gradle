@@ -12,7 +12,7 @@ buildscript {
     }
 
     dependencies {
-      classpath 'com.android.tools.build:gradle:4.2.2'
+      classpath 'com.android.tools.build:gradle:8.5.1'
     }
   }
 }
@@ -57,11 +57,11 @@ repositories {
 
 dependencies {
   implementation "com.facebook.react:react-native:+"  // From node_modules
-  implementation "com.amazonaws:ivs-broadcast:1.16.0"
+  implementation "com.amazonaws:ivs-broadcast:1.37.1"
 
 
   // CameraX core library using the camera2 implementation
-  def camerax_version = "1.2.1"
+  def camerax_version = "1.5.2"
   // The following line is optional, as the core library is included indirectly by camera-camera2
   implementation "androidx.camera:camera-core:${camerax_version}"
   implementation "androidx.camera:camera-camera2:${camerax_version}"
